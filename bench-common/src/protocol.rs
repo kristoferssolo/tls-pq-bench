@@ -1,0 +1,145 @@
+//! Benchmark protocol implementation.
+//!
+//! Protocol specification:
+//! 1. Client sends 8-byte little-endian u64: requested payload size N
+//! 2. Server responds with exactly N bytes (deterministic pattern)
+//!
+//! The deterministic pattern is a repeating sequence of bytes 0x00..0xFF.
+
+// Casts are intentional: MAX_PAYLOAD_SIZE (16 MiB) fits in usize on 64-bit,
+// and byte patterns are explicitly masked to 0xFF before casting.
+#![allow(clippy::cast_possible_truncation)]
+
+use std::io;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+/// Size of the request header (u64 payload size).
+pub const REQUEST_SIZE: usize = 8;
+
+/// Maximum allowed payload size (16 MiB).
+pub const MAX_PAYLOAD_SIZE: u64 = 16 * 1024 * 1024;
+
+/// Read the payload size request from a stream.
+///
+/// # Errors
+/// Returns an error if reading fails or payload size exceeds maximum.
+pub async fn read_request<R: AsyncReadExt + Unpin>(reader: &mut R) -> io::Result<u64> {
+    let mut buf = [0u8; REQUEST_SIZE];
+    reader.read_exact(&mut buf).await?;
+    let size = u64::from_le_bytes(buf);
+
+    if size > MAX_PAYLOAD_SIZE {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("payload size {size} exceeds maximum {MAX_PAYLOAD_SIZE}"),
+        ));
+    }
+
+    Ok(size)
+}
+
+/// Write a payload size request to a stream.
+///
+/// # Errors
+/// Returns an error if writing fails.
+pub async fn write_request<W: AsyncWriteExt + Unpin>(writer: &mut W, size: u64) -> io::Result<()> {
+    let buf = size.to_le_bytes();
+    writer.write_all(&buf).await
+}
+
+/// Generate deterministic payload of the given size.
+///
+/// The pattern is a repeating sequence: 0x00, 0x01, ..., 0xFF, 0x00, ...
+#[must_use]
+pub fn generate_payload(size: u64) -> Vec<u8> {
+    let size = size as usize;
+    let mut payload = Vec::with_capacity(size);
+    for i in 0..size {
+        payload.push((i & 0xFF) as u8);
+    }
+    payload
+}
+
+/// Write deterministic payload to a stream.
+///
+/// Writes in chunks to avoid allocating large buffers.
+///
+/// # Errors
+/// Returns an error if writing fails.
+pub async fn write_payload<W: AsyncWriteExt + Unpin>(writer: &mut W, size: u64) -> io::Result<()> {
+    const CHUNK_SIZE: usize = 64 * 1024;
+    let mut remaining = size as usize;
+    let mut offset = 0usize;
+
+    while remaining > 0 {
+        let chunk_len = remaining.min(CHUNK_SIZE);
+        let chunk: Vec<u8> = (0..chunk_len)
+            .map(|i| ((offset + i) & 0xFF) as u8)
+            .collect();
+        writer.write_all(&chunk).await?;
+        remaining -= chunk_len;
+        offset += chunk_len;
+    }
+
+    Ok(())
+}
+
+/// Read and discard payload from a stream, returning the number of bytes read.
+///
+/// # Errors
+/// Returns an error if reading fails.
+pub async fn read_payload<R: AsyncReadExt + Unpin>(
+    reader: &mut R,
+    expected_size: u64,
+) -> io::Result<u64> {
+    const CHUNK_SIZE: usize = 64 * 1024;
+    let mut buf = vec![0u8; CHUNK_SIZE];
+    let mut total_read = 0u64;
+
+    while total_read < expected_size {
+        let to_read = ((expected_size - total_read) as usize).min(CHUNK_SIZE);
+        reader.read_exact(&mut buf[..to_read]).await?;
+        total_read += to_read as u64;
+    }
+
+    Ok(total_read)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn generate_payload_pattern() {
+        let payload = generate_payload(300);
+        assert_eq!(payload.len(), 300);
+        assert_eq!(payload[0], 0x00);
+        assert_eq!(payload[255], 0xFF);
+        assert_eq!(payload[256], 0x00);
+        assert_eq!(payload[299], 43);
+    }
+
+    #[tokio::test]
+    async fn roundtrip_request() {
+        let mut buf = Vec::new();
+        write_request(&mut buf, 12345)
+            .await
+            .expect("write should succeed");
+        assert_eq!(buf.len(), REQUEST_SIZE);
+
+        let mut cursor = Cursor::new(buf);
+        let size = read_request(&mut cursor)
+            .await
+            .expect("read should succeed");
+        assert_eq!(size, 12345);
+    }
+
+    #[tokio::test]
+    async fn reject_oversized_request() {
+        let buf = (MAX_PAYLOAD_SIZE + 1).to_le_bytes();
+        let mut cursor = Cursor::new(buf);
+        let result = read_request(&mut cursor).await;
+        assert!(result.is_err());
+    }
+}

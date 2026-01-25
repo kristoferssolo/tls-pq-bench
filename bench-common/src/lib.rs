@@ -1,6 +1,7 @@
 //! Common types and utilities for the TLS benchmark harness.
 
 pub mod cert;
+pub mod protocol;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
