@@ -1,5 +1,7 @@
 //! Common types and utilities for the TLS benchmark harness.
 
+pub mod cert;
+
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use strum::{Display, EnumString};
@@ -63,9 +65,9 @@ mod tests {
             ttlb_ns: 2_000_000,
         };
         let json = record.to_ndjson().expect("serialization should succeed");
-        assert!(json.contains("\"iteration\":0"));
-        assert!(json.contains("\"mode\":\"x25519\""));
-        assert!(json.contains("\"payload_bytes\":1024"));
+        assert!(json.contains(r#""iteration":0"#));
+        assert!(json.contains(r#""mode":"x25519""#));
+        assert!(json.contains(r#""payload_bytes":1024"#));
     }
 
     #[test]
