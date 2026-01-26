@@ -6,11 +6,11 @@
 //!
 //! Outputs NDJSON records to stdout or a file.
 
+use clap::Parser;
 use common::{
     BenchRecord, KeyExchangeMode,
     protocol::{read_payload, write_request},
 };
-use clap::Parser;
 use miette::miette;
 use std::{
     fs::File,

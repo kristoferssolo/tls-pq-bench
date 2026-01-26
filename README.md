@@ -43,3 +43,8 @@ All experiments should record:
 - kernel version
 - rustls and aws-lc-rs versions
 - exact CLI parameters and network profile
+
+## License
+
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
+[MIT license](LICENSE-MIT) at your option.

@@ -4,12 +4,12 @@
 //! - Reads 8-byte little-endian u64 (requested payload size N)
 //! - Responds with exactly N bytes (deterministic pattern)
 
+use clap::Parser;
 use common::{
     KeyExchangeMode,
     cert::{CaCertificate, ServerCertificate},
     protocol::{read_request, write_payload},
 };
-use clap::Parser;
 use miette::miette;
 use rustls::{
     ServerConfig,
