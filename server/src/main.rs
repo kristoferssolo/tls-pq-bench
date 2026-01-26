@@ -4,7 +4,7 @@
 //! - Reads 8-byte little-endian u64 (requested payload size N)
 //! - Responds with exactly N bytes (deterministic pattern)
 
-use bench_common::{
+use common::{
     KeyExchangeMode,
     cert::{CaCertificate, ServerCertificate},
     protocol::{read_request, write_payload},
@@ -27,7 +27,7 @@ use tokio_rustls::LazyConfigAcceptor;
 
 /// TLS benchmark server.
 #[derive(Debug, Parser)]
-#[command(name = "bench-server", version, about)]
+#[command(name = "server", version, about)]
 struct Args {
     /// Key exchange mode.
     #[arg(long, default_value = "x25519")]
@@ -48,8 +48,7 @@ fn build_tls_config(
     provider.kx_groups = match mode {
         KeyExchangeMode::X25519 => vec![kx_group::X25519],
         KeyExchangeMode::X25519Mlkem768 => {
-            // TODO: Configure hybrid PQ key exchange
-            return Err(miette!("X25519Mlkem768 not yet implemented"));
+            todo!("Configure hybrid PQ key exchange")
         }
     };
 
@@ -147,7 +146,7 @@ async fn run_server(args: Args, tls_config: Arc<ServerConfig>) -> miette::Result
 async fn main() -> miette::Result<()> {
     let args = Args::parse();
 
-    eprintln!("bench-server configuration:");
+    eprintln!("server configuration:");
     eprintln!("  mode:   {}", args.mode);
     eprintln!("  listen: {}", args.listen);
     eprintln!();

@@ -11,7 +11,7 @@ cargo build --release
 Example:
 
 ```bash
-./target/release/bench-server --mode x25519 --listen 0.0.0.0:4433
+./target/release/server --mode x25519 --listen 0.0.0.0:4433
 ```
 
 ## 3) Run client benchmark
@@ -19,7 +19,7 @@ Example:
 Example:
 
 ```bash
-./target/release/bench-runner \
+./target/release/runner \
   --server 1.2.3.4:4433 \
   --mode x25519mlkem768 \
   --payload-bytes 1024 \
@@ -35,7 +35,7 @@ Run on the client:
 
 ```bash
  perf stat -e cycles,instructions,cache-misses \
-   ./target/release/bench-runner ...
+   ./target/release/runner ...
 ```
 
 ## 5) Summarize

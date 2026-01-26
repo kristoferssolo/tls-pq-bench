@@ -165,39 +165,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
-name = "bench-common"
-version = "0.1.0"
-dependencies = [
- "rcgen",
- "serde",
- "serde_json",
- "strum",
- "tokio",
-]
-
-[[package]]
-name = "bench-runner"
-version = "0.1.0"
-dependencies = [
- "bench-common",
- "clap",
- "miette",
- "tokio",
-]
-
-[[package]]
-name = "bench-server"
-version = "0.1.0"
-dependencies = [
- "bench-common",
- "clap",
- "miette",
- "rustls",
- "tokio",
- "tokio-rustls",
-]
-
-[[package]]
 name = "bitflags"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -281,6 +248,17 @@ name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
+
+[[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "rcgen",
+ "serde",
+ "serde_json",
+ "strum",
+ "tokio",
+]
 
 [[package]]
 name = "data-encoding"
@@ -689,6 +667,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "runner"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "common",
+ "miette",
+ "tokio",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -798,6 +786,18 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "common",
+ "miette",
+ "rustls",
+ "tokio",
+ "tokio-rustls",
 ]
 
 [[package]]

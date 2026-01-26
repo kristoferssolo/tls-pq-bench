@@ -6,7 +6,7 @@
 //!
 //! Outputs NDJSON records to stdout or a file.
 
-use bench_common::{
+use common::{
     BenchRecord, KeyExchangeMode,
     protocol::{read_payload, write_request},
 };
@@ -23,7 +23,7 @@ use tokio::net::TcpStream;
 
 /// TLS benchmark runner.
 #[derive(Debug, Parser)]
-#[command(name = "bench-runner", version, about)]
+#[command(name = "runner", version, about)]
 struct Args {
     /// Key exchange mode.
     #[arg(long, default_value = "x25519")]
@@ -144,7 +144,7 @@ async fn run_benchmark(args: Args) -> miette::Result<()> {
 async fn main() -> miette::Result<()> {
     let args = Args::parse();
 
-    eprintln!("bench-runner configuration:");
+    eprintln!("runner configuration:");
     eprintln!("  mode:          {}", args.mode);
     eprintln!("  server:        {}", args.server);
     eprintln!("  payload_bytes: {}", args.payload_bytes);

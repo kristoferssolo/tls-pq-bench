@@ -1,11 +1,11 @@
 [package]
-name = "bench-runner"
+name = "runner"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-bench-common.workspace = true
+common.workspace = true
 clap.workspace = true
 miette.workspace = true
 tokio.workspace = true

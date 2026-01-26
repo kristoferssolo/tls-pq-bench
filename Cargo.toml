@@ -1,5 +1,5 @@
 [workspace]
-members = ["bench-common", "bench-runner", "bench-server"]
+members = ["common", "runner", "server"]
 resolver = "3"
 
 [workspace.package]
@@ -9,7 +9,7 @@ edition = "2024"
 
 [workspace.dependencies]
 aws-lc-rs = "1"
-bench-common = { path = "bench-common" }
+common = { path = "common" }
 claims = "0.8"
 clap = { version = "4.5", features = ["derive"] }
 miette = { version = "7", features = ["fancy"] }
