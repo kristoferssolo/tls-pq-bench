@@ -8,7 +8,9 @@ edition.workspace = true
 bench-common.workspace = true
 clap.workspace = true
 miette.workspace = true
+rustls.workspace = true
 tokio.workspace = true
+tokio-rustls.workspace = true
 
 [lints]
 workspace = true

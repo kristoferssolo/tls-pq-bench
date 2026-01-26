@@ -6,15 +6,19 @@
 //!
 //! Outputs NDJSON records to stdout or a file.
 
-use bench_common::protocol::{read_payload, write_request};
-use bench_common::{BenchRecord, KeyExchangeMode};
+use bench_common::{
+    BenchRecord, KeyExchangeMode,
+    protocol::{read_payload, write_request},
+};
 use clap::Parser;
 use miette::miette;
-use std::fs::File;
-use std::io::{BufWriter, Write, stdout};
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::time::Instant;
+use std::{
+    fs::File,
+    io::{BufWriter, Write, stdout},
+    net::SocketAddr,
+    path::PathBuf,
+    time::Instant,
+};
 use tokio::net::TcpStream;
 
 /// TLS benchmark runner.
