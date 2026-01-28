@@ -55,6 +55,7 @@ impl fmt::Display for BenchRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn bench_record_serializes_to_ndjson() {
@@ -73,7 +74,6 @@ mod tests {
 
     #[test]
     fn key_exchange_mode_from_str() {
-        use std::str::FromStr;
         assert_eq!(
             KeyExchangeMode::from_str("x25519").expect("should parse"),
             KeyExchangeMode::X25519

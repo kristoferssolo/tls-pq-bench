@@ -680,7 +680,9 @@ dependencies = [
  "clap",
  "common",
  "miette",
+ "rustls",
  "tokio",
+ "tokio-rustls",
 ]
 
 [[package]]

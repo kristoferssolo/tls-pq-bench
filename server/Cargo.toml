@@ -5,12 +5,12 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-common.workspace = true
 clap.workspace = true
+common.workspace = true
 miette.workspace = true
 rustls.workspace = true
-tokio.workspace = true
 tokio-rustls.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true
