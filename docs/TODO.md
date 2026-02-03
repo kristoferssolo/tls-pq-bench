@@ -4,31 +4,31 @@
 
 ### Server (`proto=raw`)
 
-- [ ] TLS acceptor (rustls)
-- [ ] Read 8-byte length `N`
-- [ ] Send `N` bytes deterministic payload
+- [x] TLS acceptor (rustls)
+- [x] Read 8-byte length `N`
+- [x] Send `N` bytes deterministic payload
 
 ### Client (`proto=raw`)
 
-- [ ] Connect TLS
-- [ ] Send `N`
-- [ ] Read exactly `N` bytes
+- [x] Connect TLS
+- [x] Send `N`
+- [x] Read exactly `N` bytes
 
 ## Milestone 2 -- Measurement instrumentation \[MUST\]
 
-- [ ] T0 before connect
-- [ ] T_hs_done after handshake completion
-- [ ] T_last after last byte read
-- [ ] Output NDJSON
+- [x] T0 before connect
+- [x] T_hs_done after handshake completion
+- [x] T_last after last byte read
+- [x] Output NDJSON
 
 ## Milestone 3 -- KX selection (X25519 vs X25519MLKEM768) \[MUST\]
 
-- [ ] rustls provider wiring (`aws_lc_rs` for PQ)
+- [x] rustls provider wiring (`aws_lc_rs` for PQ)
 - [ ] negotiated group logging (debug mode)
 
 ## Milestone 4 -- Concurrency & runner [MUST]
 
-- [ ] tokio-based runner
+- [x] tokio-based runner
 - [ ] concurrency control and warmup
 - [ ] matrix runner over (mode, payload, concurrency)
 
