@@ -15,7 +15,10 @@ use miette::miette;
 use rustls::{
     ClientConfig, DigitallySignedStruct, SignatureScheme,
     client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
-    crypto::aws_lc_rs::{self, kx_group::X25519},
+    crypto::aws_lc_rs::{
+        self,
+        kx_group::{X25519, X25519MLKEM768},
+    },
     pki_types::{CertificateDer, ServerName, UnixTime},
     version::TLS13,
 };
@@ -126,9 +129,7 @@ fn build_tls_config(mode: KeyExchangeMode) -> miette::Result<Arc<ClientConfig>> 
     let mut provider = aws_lc_rs::default_provider();
     provider.kx_groups = match mode {
         KeyExchangeMode::X25519 => vec![X25519],
-        KeyExchangeMode::X25519Mlkem768 => {
-            todo!("Configure hybrid PQ key exchange")
-        }
+        KeyExchangeMode::X25519Mlkem768 => vec![X25519MLKEM768],
     };
 
     let config = ClientConfig::builder_with_provider(Arc::new(provider))

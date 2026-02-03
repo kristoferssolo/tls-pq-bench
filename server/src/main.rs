@@ -13,7 +13,10 @@ use common::{
 use miette::miette;
 use rustls::{
     ServerConfig,
-    crypto::aws_lc_rs::{self, kx_group::X25519},
+    crypto::aws_lc_rs::{
+        self,
+        kx_group::{X25519, X25519MLKEM768},
+    },
     pki_types::{CertificateDer, PrivateKeyDer},
     server::Acceptor,
     version::TLS13,
@@ -47,9 +50,7 @@ fn build_tls_config(
     let mut provider = aws_lc_rs::default_provider();
     provider.kx_groups = match mode {
         KeyExchangeMode::X25519 => vec![X25519],
-        KeyExchangeMode::X25519Mlkem768 => {
-            todo!("Configure hybrid PQ key exchange")
-        }
+        KeyExchangeMode::X25519Mlkem768 => vec![X25519MLKEM768],
     };
 
     // Convert certificate chain
