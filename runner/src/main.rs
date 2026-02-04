@@ -23,6 +23,8 @@ use rustls::{
     version::TLS13,
 };
 use std::{
+    env,
+    fmt::Debug,
     fs::File,
     io::{BufWriter, Write, stdout},
     net::SocketAddr,
@@ -32,6 +34,9 @@ use std::{
 };
 use tokio::{net::TcpStream, sync::Semaphore, task::JoinHandle};
 use tokio_rustls::TlsConnector;
+use tracing::info;
+use tracing_subscriber::EnvFilter;
+use uuid::Uuid;
 
 /// TLS benchmark runner.
 #[derive(Debug, Parser)]
@@ -165,15 +170,15 @@ async fn run_iteration(
 
     let handshake_ns = start.elapsed().as_nanos() as u64;
 
-        // Send request
-        write_request(&mut tls_stream, u64::from(payload_bytes))
-            .await
-            .map_err(|e| miette!("write request failed: {e}"))?;
+    // Send request
+    write_request(&mut tls_stream, u64::from(payload_bytes))
+        .await
+        .map_err(|e| miette!("write request failed: {e}"))?;
 
-        // Read response
-        read_payload(&mut tls_stream, u64::from(payload_bytes))
-            .await
-            .map_err(|e| miette!("read payload failed: {e}"))?;
+    // Read response
+    read_payload(&mut tls_stream, u64::from(payload_bytes))
+        .await
+        .map_err(|e| miette!("read payload failed: {e}"))?;
 
     let ttlb_ns = start.elapsed().as_nanos() as u64;
 
@@ -198,11 +203,12 @@ async fn run_benchmark(
         None => Box::new(stdout()),
     };
 
-    eprintln!(
-        "Running {} warmup + {} measured iterations (concurrency: {}, TLS 1.3)",
-        args.warmup, args.iters, args.concurrency
+    info!(
+        warmup = args.warmup,
+        iters = args.iters,
+        concurrency = args.concurrency,
+        "runnning benchmark iterations"
     );
-    eprintln!();
 
     for _ in 0..args.warmup {
         run_iteration(
@@ -213,7 +219,7 @@ async fn run_benchmark(
         )
         .await?;
     }
-    eprintln!("Warmup complete.");
+    info!("warmup complete");
 
     #[allow(clippy::cast_possible_truncation)] // concurrency is limited to reasonable values
     let semaphore = Arc::new(Semaphore::new(args.concurrency as usize));
@@ -225,7 +231,7 @@ async fn run_benchmark(
         .flush()
         .map_err(|e| miette!("failed to flush output: {e}"))?;
 
-    eprintln!("Benchmark complete.");
+    info!("benchmark complete");
     Ok(())
 }
 
@@ -256,7 +262,6 @@ fn spawn_benchmark_tasks(
         .collect()
 }
 
-#[allow(clippy::too_many_arguments)]
 fn spawn_single_iteration(
     i: u32,
     payload_bytes: u32,
@@ -303,22 +308,33 @@ async fn write_results(
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
-    let args = Args::parse();
+    let run_id = Uuid::new_v4();
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_target(false)
+        .init();
 
-    eprintln!("runner configuration:");
-    eprintln!("  mode:          {}", args.mode);
-    eprintln!("  server:        {}", args.server);
-    eprintln!("  payload_bytes: {}", args.payload_bytes);
-    eprintln!("  iters:         {}", args.iters);
-    eprintln!("  warmup:        {}", args.warmup);
-    eprintln!("  concurrency:   {}", args.concurrency);
-    eprintln!(
-        "  out:           {}",
-        args.out
-            .as_ref()
-            .map_or_else(|| "stdout".to_string(), |p| p.display().to_string())
+    info!(
+        run_id=%run_id,
+        rust_version=env!("RUSTC_VERSION"),
+        on=env::consts::OS,
+        arch=env::consts::ARCH,
+        command=env::args().collect::<Vec<_>>().join(" "),
+        "benchmark started"
     );
-    eprintln!();
+
+    let args = Args::parse();
+    info!(
+        mode=%args.mode,
+        server=%args.server,
+        payload_bytes=%args.payload_bytes,
+        iters=%args.iters,
+        warmup=%args.warmup,
+        concurrency=%args.concurrency,
+        out=%args.out.as_ref().map_or("stdout", |p| p.to_str().unwrap_or("invalid")),
+        "runner configuration"
+    );
 
     // Build TLS config (skips certificate verification for benchmarking)
     let tls_config = build_tls_config(args.mode)?;
