@@ -11,6 +11,9 @@ miette.workspace = true
 rustls.workspace = true
 tokio-rustls.workspace = true
 tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
 
 [lints]
 workspace = true

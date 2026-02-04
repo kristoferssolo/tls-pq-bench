@@ -29,7 +29,7 @@
 ## Milestone 4 -- Concurrency & runner [MUST]
 
 - [x] tokio-based runner
-- [ ] concurrency control and warmup
+- [X] concurrency control and warmup
 - [ ] matrix runner over (mode, payload, concurrency)
 
 ## Milestone 5 -- HTTP/1.1 mode (hyper) \[OPTIONAL\]

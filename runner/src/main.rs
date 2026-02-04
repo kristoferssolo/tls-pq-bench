@@ -130,7 +130,6 @@ impl ServerCertVerifier for NoVerifier {
 
 /// Build TLS client config for the given key exchange mode.
 fn build_tls_config(mode: KeyExchangeMode) -> miette::Result<Arc<ClientConfig>> {
-    // Select crypto provider with appropriate key exchange groups
     let mut provider = aws_lc_rs::default_provider();
     provider.kx_groups = match mode {
         KeyExchangeMode::X25519 => vec![X25519],
@@ -157,12 +156,10 @@ async fn run_iteration(
 ) -> miette::Result<IterationResult> {
     let start = Instant::now();
 
-    // TCP connect
     let stream = TcpStream::connect(server)
         .await
         .map_err(|e| miette!("TCP connection failed: {e}"))?;
 
-    // TLS handshake
     let mut tls_stream = tls_connector
         .connect(server_name.clone(), stream)
         .await
@@ -170,12 +167,10 @@ async fn run_iteration(
 
     let handshake_ns = start.elapsed().as_nanos() as u64;
 
-    // Send request
     write_request(&mut tls_stream, u64::from(payload_bytes))
         .await
         .map_err(|e| miette!("write request failed: {e}"))?;
 
-    // Read response
     read_payload(&mut tls_stream, u64::from(payload_bytes))
         .await
         .map_err(|e| miette!("read payload failed: {e}"))?;
@@ -193,7 +188,6 @@ async fn run_benchmark(
     tls_connector: TlsConnector,
     server_name: ServerName<'static>,
 ) -> miette::Result<()> {
-    // Open output file or use stdout
     let mut output: Box<dyn Write + Send> = match &args.out {
         Some(path) => {
             let file =
@@ -316,11 +310,11 @@ async fn main() -> miette::Result<()> {
         .init();
 
     info!(
-        run_id=%run_id,
-        rust_version=env!("RUSTC_VERSION"),
-        on=env::consts::OS,
-        arch=env::consts::ARCH,
-        command=env::args().collect::<Vec<_>>().join(" "),
+        run_id = %run_id,
+        rust_version = env!("RUSTC_VERSION"),
+        os = env::consts::OS,
+        arch = env::consts::ARCH,
+        command = env::args().collect::<Vec<_>>().join(" "),
         "benchmark started"
     );
 
@@ -336,11 +330,9 @@ async fn main() -> miette::Result<()> {
         "runner configuration"
     );
 
-    // Build TLS config (skips certificate verification for benchmarking)
     let tls_config = build_tls_config(args.mode)?;
     let tls_connector = TlsConnector::from(tls_config);
 
-    // Server name for TLS (use "localhost" for local testing)
     let server_name = ServerName::try_from("localhost".to_string())
         .map_err(|e| miette!("invalid server name: {e}"))?;
 

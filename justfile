@@ -1,7 +1,11 @@
+export RUSTC_WRAPPER := "sccache"
+set shell := ["bash", "-cu"]
+
 # Default recipe
 default:
     @just --list
 
+alias c := check
 # Run all checks (fmt, clippy, docs, test)
 check: fmt clippy docs test
 
@@ -47,7 +51,6 @@ runner server mode="x25519" payload="1024" iters="100" warmup="10":
         --iters {{iters}} \
         --warmup {{warmup}}
 
-alias c := clean
 # Clean build artifacts
 clean:
     cargo clean
