@@ -52,12 +52,7 @@ pub async fn write_request<W: AsyncWriteExt + Unpin>(writer: &mut W, size: u64) 
 /// The pattern is a repeating sequence: 0x00, 0x01, ..., 0xFF, 0x00, ...
 #[must_use]
 pub fn generate_payload(size: u64) -> Vec<u8> {
-    let size = size as usize;
-    let mut payload = Vec::with_capacity(size);
-    for i in 0..size {
-        payload.push((i & 0xFF) as u8);
-    }
-    payload
+    (0..size).map(|i| (i & 0xFF) as u8).collect()
 }
 
 /// Write deterministic payload to a stream.
@@ -69,13 +64,13 @@ pub fn generate_payload(size: u64) -> Vec<u8> {
 pub async fn write_payload<W: AsyncWriteExt + Unpin>(writer: &mut W, size: u64) -> io::Result<()> {
     const CHUNK_SIZE: usize = 64 * 1024;
     let mut remaining = size as usize;
-    let mut offset = 0usize;
+    let mut offset = 0;
 
     while remaining > 0 {
         let chunk_len = remaining.min(CHUNK_SIZE);
-        let chunk: Vec<u8> = (0..chunk_len)
+        let chunk = (0..chunk_len)
             .map(|i| ((offset + i) & 0xFF) as u8)
-            .collect();
+            .collect::<Vec<_>>();
         writer.write_all(&chunk).await?;
         remaining -= chunk_len;
         offset += chunk_len;
@@ -93,8 +88,8 @@ pub async fn read_payload<R: AsyncReadExt + Unpin>(
     expected_size: u64,
 ) -> io::Result<u64> {
     const CHUNK_SIZE: usize = 64 * 1024;
-    let mut buf = vec![0u8; CHUNK_SIZE];
-    let mut total_read = 0u64;
+    let mut buf = vec![0; CHUNK_SIZE];
+    let mut total_read = 0;
 
     while total_read < expected_size {
         let to_read = ((expected_size - total_read) as usize).min(CHUNK_SIZE);

@@ -78,18 +78,23 @@ async fn handle_connection(stream: TcpStream, peer: SocketAddr, tls_config: Arc<
     let start_handshake = match acceptor.await {
         Ok(sh) => sh,
         Err(e) => {
-            warn!(peer = %peer, error = %e, "TLS accept error");
-            return;
+            return warn!(peer = %peer, error = %e, "TLS accept error");
         }
     };
 
     let mut tls_stream = match start_handshake.into_stream(tls_config).await {
         Ok(s) => s,
         Err(e) => {
-            warn!(peer = %peer, error = %e, "TLS handshake error");
-            return;
+            return warn!(peer = %peer, error = %e, "TLS handshake error");
         }
     };
+
+    let (_, conn) = tls_stream.get_ref();
+    info!(
+        cipher = ?conn.negotiated_cipher_suite(),
+        version = ?conn.protocol_version(),
+        "connection established"
+    );
 
     loop {
         let payload_size = match read_request(&mut tls_stream).await {
