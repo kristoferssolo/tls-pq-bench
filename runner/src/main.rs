@@ -165,9 +165,6 @@ async fn run_iteration(
         .await
         .map_err(|e| miette!("TLS handshake failed: {e}"))?;
 
-    let (_, conn) = tls_stream.get_ref();
-    info!(cipher = ?conn.negotiated_cipher_suite(), "connection established");
-
     let handshake_ns = start.elapsed().as_nanos() as u64;
 
     write_request(&mut tls_stream, u64::from(payload_bytes))
@@ -217,6 +214,19 @@ async fn run_benchmark(
         .await?;
     }
     info!("warmup complete");
+
+    let test_conn = tls_connector
+        .connect(
+            server_name.clone(),
+            TcpStream::connect(args.server)
+                .await
+                .map_err(|e| miette!("failed to connect to server {}: {e}", args.server))?,
+        )
+        .await
+        .map_err(|e| miette!("TLS handshake failed: {e}"))?;
+
+    let cipher = test_conn.get_ref().1.negotiated_cipher_suite();
+    info!(cipher = ?cipher, "TLS handshake complete");
 
     #[allow(clippy::cast_possible_truncation)] // concurrency is limited to reasonable values
     let semaphore = Arc::new(Semaphore::new(args.concurrency as usize));
