@@ -10,6 +10,7 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 aws-lc-rs = "1"
+base64 = "0.22"
 cargo-husky = { version = "1", default-features = false, features = [
   "user-hooks",
 ] }

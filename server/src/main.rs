@@ -4,6 +4,7 @@
 //! - Reads 8-byte little-endian u64 (requested payload size N)
 //! - Responds with exactly N bytes (deterministic pattern)
 
+use base64::prelude::*;
 use clap::Parser;
 use common::{
     KeyExchangeMode,
@@ -21,7 +22,7 @@ use rustls::{
     server::Acceptor,
     version::TLS13,
 };
-use std::{env, fmt::Write, io::ErrorKind, net::SocketAddr, sync::Arc};
+use std::{env, io::ErrorKind, net::SocketAddr, sync::Arc};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -171,44 +172,13 @@ async fn main() -> miette::Result<()> {
     let tls_config = build_tls_config(args.mode, &server_cert)?;
 
     info!(
-        ca_cert_base64 = base64_encode(&ca.cert_der)
-            .lines()
-            .take(3)
+        ca_cert_base64 = BASE64_STANDARD
+            .encode(ca.cert_der)
+            .chars()
+            .take(256)
             .collect::<String>(),
         "CA cert (truncated)"
     );
 
     run_server(args, tls_config).await
-}
-
-/// Simple base64 encoding for certificate display.
-fn base64_encode(data: &[u8]) -> String {
-    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    let mut result = String::new();
-    for chunk in data.chunks(3) {
-        let mut n = 0;
-        for (i, &byte) in chunk.iter().enumerate() {
-            n |= u32::from(byte) << (16 - 8 * i);
-        }
-
-        for i in 0..=chunk.len() {
-            let idx = ((n >> (18 - 6 * i)) & 0x3F) as usize;
-            result.push(ALPHABET[idx] as char);
-        }
-
-        for _ in chunk.len()..3 {
-            result.push('=');
-        }
-    }
-
-    let mut wrapped = String::new();
-    for (i, c) in result.chars().enumerate() {
-        if i > 0 && i % 76 == 0 {
-            let _ = writeln!(wrapped);
-        }
-        wrapped.push(c);
-    }
-
-    wrapped
 }

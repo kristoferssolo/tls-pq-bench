@@ -5,6 +5,7 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+base64.workspace = true
 clap.workspace = true
 common.workspace = true
 miette.workspace = true
