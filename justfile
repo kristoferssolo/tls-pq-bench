@@ -1,48 +1,70 @@
 export RUSTC_WRAPPER := "sccache"
+export RUST_LOG := env_var_or_default("RUST_LOG", "warn")
+
 set shell := ["bash", "-cu"]
 
 # Default recipe
 default:
     @just --list
 
+alias b := build
 alias c := check
+alias d := docs
+alias f := fmt
+alias t := test
+
 # Run all checks (fmt, clippy, docs, test)
+[group("dev")]
 check: fmt clippy docs test
 
-alias f := fmt
 # Format code
+[group("dev")]
 fmt:
     cargo fmt --all
 
 # Check formatting without modifying
+[group("dev")]
 fmt-check:
     cargo fmt --all -- --check
 
 # Run clippy
+[group("dev")]
 clippy:
     cargo clippy --all-targets --all-features -- -D warnings
 
-alias d := docs
 # Build documentation
+[group("dev")]
 docs:
     RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 
-alias t := test
 # Run tests with nextest
+[group("dev")]
 test:
     cargo nextest run --all-features
     cargo test --doc
 
-alias b := build
 # Build release binaries
+[group("dev")]
 build:
     cargo build --release
 
+# Clean build artifacts
+[group("dev")]
+clean:
+    cargo clean
+
+# Install dev dependencies
+[group("dev")]
+setup:
+    cargo install cargo-nextest
+
 # Run server (default: x25519 on localhost:4433)
+[group("run")]
 server mode="x25519" listen="127.0.0.1:4433":
     cargo run --release --bin server -- --mode {{mode}} --listen {{listen}}
 
 # Run benchmark runner
+[group("run")]
 runner server mode="x25519" payload="1024" iters="100" warmup="10":
     cargo run --release --bin runner -- \
         --server {{server}} \
@@ -51,10 +73,9 @@ runner server mode="x25519" payload="1024" iters="100" warmup="10":
         --iters {{iters}} \
         --warmup {{warmup}}
 
-# Clean build artifacts
-clean:
-    cargo clean
+# Run benchmark runner from a config file
+[group("run")]
+benchmark config="benchmarks.toml":
+    cargo run --release --bin runner -- \
+        --config {{config}}
 
-# Install dev dependencies
-setup:
-    cargo install cargo-nextest
