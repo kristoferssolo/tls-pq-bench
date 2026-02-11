@@ -1,5 +1,5 @@
 use crate::{args::Args, error};
-use common::KeyExchangeMode;
+use common::{self, KeyExchangeMode};
 use serde::Deserialize;
 use std::{fs::read_to_string, net::SocketAddr, path::PathBuf};
 
@@ -23,8 +23,8 @@ pub struct Config {
 /// # Errors
 /// Returns an error if the file cannot be read or parsed.
 pub fn load_from_file(path: &PathBuf) -> error::Result<Config> {
-    let content = read_to_string(path).map_err(error::Error::Io)?;
-    let config = toml::from_str::<Config>(&content).map_err(error::Error::Toml)?;
+    let content = read_to_string(path).map_err(common::Error::Io)?;
+    let config = toml::from_str::<Config>(&content).map_err(common::Error::Toml)?;
     Ok(config)
 }
 
@@ -42,7 +42,7 @@ pub fn load_from_cli(args: &Args) -> error::Result<Config> {
             concurrency: args.concurrency,
             server: args
                 .server
-                .ok_or_else(|| error::Error::config("--server ir required"))?,
+                .ok_or_else(|| common::Error::config("--server ir required"))?,
         }],
     })
 }

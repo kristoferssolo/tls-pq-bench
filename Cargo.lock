@@ -275,11 +275,15 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "cargo-husky",
+ "miette",
  "rcgen",
+ "rustls",
  "serde",
  "serde_json",
  "strum",
+ "thiserror",
  "tokio",
+ "toml",
 ]
 
 [[package]]
@@ -915,6 +919,7 @@ dependencies = [
  "common",
  "miette",
  "rustls",
+ "thiserror",
  "tokio",
  "tokio-rustls",
  "tracing",

@@ -1,8 +1,10 @@
 //! Common types and utilities for the TLS benchmark harness.
 
 pub mod cert;
+pub mod error;
 pub mod protocol;
 
+pub use error::Error;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use strum::{Display, EnumString};
