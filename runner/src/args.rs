@@ -11,8 +11,8 @@ pub struct Args {
     pub mode: KeyExchangeMode,
 
     /// Server address to connect to.
-    #[arg(long)]
-    pub server: SocketAddr,
+    #[arg(long, required_unless_present = "config")]
+    pub server: Option<SocketAddr>,
 
     /// Payload size in bytes to request from server.
     #[arg(long, default_value = "1024")]
