@@ -770,6 +770,7 @@ dependencies = [
  "miette",
  "rustls",
  "serde",
+ "thiserror",
  "tokio",
  "tokio-rustls",
  "toml",

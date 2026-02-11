@@ -1,6 +1,5 @@
-use crate::args::Args;
+use crate::{args::Args, error};
 use common::KeyExchangeMode;
-use miette::{Context, IntoDiagnostic, miette};
 use serde::Deserialize;
 use std::{fs::read_to_string, net::SocketAddr, path::PathBuf};
 
@@ -23,16 +22,9 @@ pub struct Config {
 ///
 /// # Errors
 /// Returns an error if the file cannot be read or parsed.
-pub fn load_from_file(path: &PathBuf) -> miette::Result<Config> {
-    let content = read_to_string(path)
-        .into_diagnostic()
-        .context(format!("failed to read config file: {}", path.display()))?;
-    let config = toml::from_str::<Config>(&content)
-        .into_diagnostic()
-        .context(format!(
-            "failed to parse TOML config from file {}",
-            path.display()
-        ))?;
+pub fn load_from_file(path: &PathBuf) -> error::Result<Config> {
+    let content = read_to_string(path).map_err(error::Error::Io)?;
+    let config = toml::from_str::<Config>(&content).map_err(error::Error::Toml)?;
     Ok(config)
 }
 
@@ -40,7 +32,7 @@ pub fn load_from_file(path: &PathBuf) -> miette::Result<Config> {
 ///
 /// # Errors
 /// Never returns an error, but returns Result for consistency.
-pub fn load_from_cli(args: &Args) -> miette::Result<Config> {
+pub fn load_from_cli(args: &Args) -> error::Result<Config> {
     Ok(Config {
         benchmarks: vec![BenchmarkConfig {
             mode: args.mode.to_string(),
@@ -50,7 +42,7 @@ pub fn load_from_cli(args: &Args) -> miette::Result<Config> {
             concurrency: args.concurrency,
             server: args
                 .server
-                .ok_or_else(|| miette!("--server is required when not using --config"))?,
+                .ok_or_else(|| error::Error::config("--server ir required"))?,
         }],
     })
 }
