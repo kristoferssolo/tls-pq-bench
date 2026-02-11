@@ -1,88 +1,13 @@
 use crate::{
-    args::Args,
+    config::{BenchmarkConfig, Config},
     error::{self, ConfigError},
 };
 use common::{self, KeyExchangeMode};
 use miette::{NamedSource, SourceSpan};
-use serde::Deserialize;
-use std::{fs::read_to_string, net::SocketAddr, path::Path};
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct BenchmarkConfig {
-    pub mode: String,
-    pub payload: u32,
-    pub iters: u32,
-    pub warmup: u32,
-    pub concurrency: u32,
-    pub server: SocketAddr,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Config {
-    pub benchmarks: Vec<BenchmarkConfig>,
-}
-
-/// Load benchmark configuration from a TOML file.
-///
-/// # Errors
-/// Returns an error if the file cannot be read or parsed.
-pub fn load_from_file(path: &Path) -> error::Result<Config> {
-    let content = read_to_string(path).map_err(|source| ConfigError::ReadError {
-        source,
-        path: path.to_owned(),
-    })?;
-
-    let src = NamedSource::new(path.display().to_string(), content.clone());
-
-    let config = toml::from_str::<Config>(&content).map_err(|source| {
-        let span = source
-            .span()
-            .map(|s| SourceSpan::new(s.start.into(), s.end - s.start));
-
-        ConfigError::TomlParseError {
-            src: src.clone(),
-            span,
-            source,
-        }
-    })?;
-
-    validate_config(&config, &content, path)?;
-
-    Ok(config)
-}
-
-/// Create benchmark configuration from CLI arguments.
-///
-/// # Errors
-/// Never returns an error, but returns Result for consistency.
-pub fn load_from_cli(args: &Args) -> error::Result<Config> {
-    Ok(Config {
-        benchmarks: vec![BenchmarkConfig {
-            mode: args.mode.to_string(),
-            payload: args.payload_bytes,
-            iters: args.iters,
-            warmup: args.warmup,
-            concurrency: args.concurrency,
-            server: args
-                .server
-                .ok_or_else(|| common::Error::config("--server ir required"))?,
-        }],
-    })
-}
-
-impl Config {
-    /// Get the key exchange mode from the first benchmark configuration.
-    #[must_use]
-    pub fn server_mode(&self) -> KeyExchangeMode {
-        self.benchmarks
-            .first()
-            .and_then(|b| b.mode.parse().ok())
-            .unwrap_or(KeyExchangeMode::X25519)
-    }
-}
+use std::path::Path;
 
 /// Validate the configuration after parsing.
-fn validate_config(config: &Config, content: &str, path: &Path) -> error::Result<()> {
+pub fn validate_config(config: &Config, content: &str, path: &Path) -> error::Result<()> {
     if config.benchmarks.is_empty() {
         return Err(ConfigError::EmptyBenchmarks {
             src: NamedSource::new(path.display().to_string(), content.to_string()),
@@ -121,39 +46,30 @@ fn validate_benchmark(
         .into());
     }
 
-    if benchmark.payload == 0 {
+    validate_positive_field(src.clone(), content, idx, "payload", benchmark.payload)?;
+    validate_positive_field(src.clone(), content, idx, "iters", benchmark.iters)?;
+    validate_positive_field(src, content, idx, "concurrency", benchmark.concurrency)?;
+
+    Ok(())
+}
+
+fn validate_positive_field(
+    src: NamedSource<String>,
+    content: &str,
+    idx: usize,
+    field_name: &str,
+    value: u32,
+) -> error::Result<()> {
+    if value == 0 {
         return Err(ConfigError::ValidationError {
             src,
-            span: find_field_span(content, idx, "payload"),
-            field: "payload".into(),
+            span: find_field_span(content, idx, field_name),
+            field: field_name.into(),
             idx,
             message: "Must be greater than 0".into(),
         }
         .into());
     }
-
-    if benchmark.iters == 0 {
-        return Err(ConfigError::ValidationError {
-            src,
-            span: find_field_span(content, idx, "iters"),
-            field: "iters".into(),
-            idx,
-            message: "Must be greater than 0".into(),
-        }
-        .into());
-    }
-
-    if benchmark.concurrency == 0 {
-        return Err(ConfigError::ValidationError {
-            src,
-            span: find_field_span(content, idx, "concurrency"),
-            field: "concurrency".into(),
-            idx,
-            message: "Must be greater than 0".into(),
-        }
-        .into());
-    }
-
     Ok(())
 }
 
