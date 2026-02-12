@@ -24,13 +24,13 @@
 ## Milestone 3 -- KX selection (X25519 vs X25519MLKEM768) \[MUST\]
 
 - [x] rustls provider wiring (`aws_lc_rs` for PQ)
-- [ ] negotiated group logging (debug mode)
+- [X] negotiated group logging (debug mode)
 
 ## Milestone 4 -- Concurrency & runner [MUST]
 
 - [x] tokio-based runner
 - [X] concurrency control and warmup
-- [ ] matrix runner over (mode, payload, concurrency)
+- [X] matrix runner over (mode, payload, concurrency)
 
 ## Milestone 5 -- HTTP/1.1 mode (hyper) \[OPTIONAL\]
 

@@ -1,48 +1,109 @@
 # tls-pq-bench
 
-Reproducible benchmarking harness for comparing TLS 1.3 key exchange
-configurations:
+Reproducible benchmarking harness for comparing TLS 1.3 key exchange configurations.
 
-- Classical: X25519
-- Hybrid PQ: X25519MLKEM768 (via `rustls` + `aws_lc_rs`)
+## Features
 
-Primary metrics:
+- **Key Exchange Modes**
+  - Classical: `x25519`
+  - Hybrid PQ: `x25519mlkem768` (via `rustls` + `aws_lc_rs`)
 
-- Handshake latency
-- TTLB (Time-to-Last-Byte)
+- **Metrics**
+  - Handshake latency (nanoseconds)
+  - TTLB - Time-to-Last-Byte (nanoseconds)
 
-Secondary metrics:
+- **Benchmark Control**
+  - Warmup iterations (excluded from results)
+  - Configurable iterations
+  - Concurrency control (parallel connections)
+  - Configurable payload sizes
 
-- CPU cycles (`perf`)
-- Memory behavior (optional: Valgrind/Massif)
-- Binary size (optional)
+- **Reproducibility**
+  - Structured logging (tracing)
+  - Run ID for correlating logs
+  - Rust version, OS, arch recorded
+  - Command line arguments logged
+  - Negotiated cipher suite logged
 
-This repo is intended as the implementation for the empirical part of the
-bachelor thesis (following the course thesis methodology).
+- **Matrix Benchmarks**
+  - TOML configuration file support
+  - Run multiple benchmark configurations sequentially
+  - Each configuration: mode, payload, iters, warmup, concurrency
 
-## Non-goals
+## Quick Start
 
-- Not a general-purpose TLS load tester
-- Not a cryptographic audit tool
-- Not a middlebox compatibility test suite (can be added later)
+### Build
 
-## Quick start (local dev)
+```bash
+cargo build --release
+```
 
-1. Install Rust stable and Linux tooling:
-   - `perf`, `tcpdump` (optional), `jq`, `python3`
-2. Build:
-   - `cargo build --release`
+### Run Single Benchmark
 
-## Reproducibility notes
+Terminal 1 - Start server:
 
-All experiments should record:
+```bash
+./target/release/server --mode x25519 --listen 127.0.0.1:4433
+```
 
-- commit hash
-- rustc version
-- CPU model and governor
-- kernel version
-- rustls and aws-lc-rs versions
-- exact CLI parameters and network profile
+Terminal 2 - Run benchmark:
+
+```bash
+./target/release/runner --server 127.0.0.1:4433 --mode x25519 --iters 100 --warmup 10
+```
+
+### Run Matrix Benchmarks
+
+Create a config file (`matrix.toml`):
+
+```toml
+[[benchmarks]]
+server = "127.0.0.1:4433"
+mode = "x25519"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+
+[[benchmarks]]
+server = "127.0.0.1:4433"
+mode = "x25519mlkem768"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+```
+
+Run:
+
+```bash
+./target/release/runner --config matrix.toml
+```
+
+### Output
+
+Results are emitted as NDJSON to stdout or a file:
+
+```ndjson
+{"iteration":0,"mode":"x25519","payload_bytes":1024,"handshake_ns":500000,"ttlb_ns":650000}
+{"iteration":1,"mode":"x25519","payload_bytes":1024,"handshake_ns":490000,"ttlb_ns":620000}
+```
+
+### Logging
+
+Enable debug logs with `RUST_LOG`:
+
+```bash
+RUST_LOG=info ./target/release/runner --server 127.0.0.1:4433
+```
+
+Output includes:
+
+- Run ID for correlation
+- Rust version, OS, arch
+- Command used
+- Negotiated cipher suite
+- Benchmark configuration
 
 ## License
 
