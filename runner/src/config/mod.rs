@@ -83,3 +83,156 @@ impl Config {
             .unwrap_or(KeyExchangeMode::X25519)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claims::assert_ok;
+
+    const VALID_CONFIG: &str = r#"
+[[benchmarks]]
+mode = "x25519"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+
+[[benchmarks]]
+mode = "x25519mlkem768"
+payload = 4096
+iters = 50
+warmup = 5
+concurrency = 4
+server = "127.0.0.1:4433"
+"#;
+
+    fn get_config_from_str(toml: &str) -> Config {
+        assert_ok!(toml::from_str::<Config>(toml))
+    }
+
+    #[test]
+    fn valid_single_benchmark() {
+        let toml = r#"
+[[benchmarks]]
+mode = "x25519"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+"#;
+        let config = get_config_from_str(toml);
+        assert_eq!(config.benchmarks.len(), 1);
+        assert_eq!(config.benchmarks[0].mode, "x25519");
+        assert_eq!(config.benchmarks[0].payload, 1024);
+    }
+
+    #[test]
+    fn valid_multiple_benchmarks() {
+        let config = get_config_from_str(VALID_CONFIG);
+        assert_eq!(config.benchmarks.len(), 2);
+        assert_eq!(config.benchmarks[0].mode, "x25519");
+        assert_eq!(config.benchmarks[1].mode, "x25519mlkem768");
+    }
+
+    #[test]
+    fn invalid_mode() {
+        let toml = r#"
+[[benchmarks]]
+mode = "invalid_mode"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+"#;
+        let config = get_config_from_str(toml);
+        assert!(config.server_mode() == KeyExchangeMode::X25519); // fallback
+    }
+
+    #[test]
+    fn payload_zero_validation() {
+        let toml = r#"
+[[benchmarks]]
+mode = "x25519"
+payload = 0
+iters = 100
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+"#;
+        let config = get_config_from_str(toml);
+        let result = validate_config(&config, toml, std::path::Path::new("test.toml"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn iters_zero_validation() {
+        let toml = r#"
+[[benchmarks]]
+mode = "x25519"
+payload = 1024
+iters = 0
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+"#;
+        let config = get_config_from_str(toml);
+        let result = validate_config(&config, toml, std::path::Path::new("test.toml"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn concurrency_zero_validation() {
+        let toml = r#"
+[[benchmarks]]
+mode = "x25519"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 0
+server = "127.0.0.1:4433"
+"#;
+        let config = get_config_from_str(toml);
+        let result = validate_config(&config, toml, std::path::Path::new("test.toml"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn empty_benchmarks() {
+        let toml = "benchmarks = []";
+        let config = get_config_from_str(toml);
+        assert!(config.benchmarks.is_empty());
+    }
+
+    #[test]
+    fn server_mode_fallback() {
+        let toml = r#"
+[[benchmarks]]
+mode = "x25519"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+"#;
+        let config = get_config_from_str(toml);
+        assert_eq!(config.server_mode(), KeyExchangeMode::X25519);
+    }
+
+    #[test]
+    fn server_mode_mlkem() {
+        let toml = r#"
+[[benchmarks]]
+mode = "x25519mlkem768"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+"#;
+        let config = get_config_from_str(toml);
+        assert_eq!(config.server_mode(), KeyExchangeMode::X25519Mlkem768);
+    }
+}
