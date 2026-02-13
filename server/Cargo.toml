@@ -16,6 +16,7 @@ tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 uuid.workspace = true
+claims.workspace = true
 
 [lints]
 workspace = true
