@@ -12,6 +12,10 @@ use common::{
     protocol::{read_payload, write_request},
 };
 use miette::miette;
+use runner::{
+    args::Args,
+    config::{load_from_cli, load_from_file},
+};
 use rustls::{
     ClientConfig, DigitallySignedStruct, SignatureScheme,
     client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
@@ -34,9 +38,6 @@ use tokio_rustls::TlsConnector;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 use uuid::Uuid;
-
-use runner::args::Args;
-use runner::config::{load_from_cli, load_from_file};
 
 /// Result of a single benchmark iteration.
 struct IterationResult {
@@ -261,8 +262,11 @@ fn spawn_single_iteration(
     })
 }
 
-#[allow(clippy::future_not_send)] // dyn Write is not Send
-async fn write_results(output: &mut dyn Write, tasks: Vec<ReturnHandle>) -> miette::Result<()> {
+// #[allow(clippy::future_not_send)] // dyn Write is not Send
+async fn write_results<W: Write + Send>(
+    output: &mut W,
+    tasks: Vec<ReturnHandle>,
+) -> miette::Result<()> {
     for task in tasks {
         let (_result, record) = task.await.expect("task should not panic");
         if let Some(record) = record {

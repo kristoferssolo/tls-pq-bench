@@ -121,4 +121,15 @@ mod tests {
         ));
         assert_eq!(mode, KeyExchangeMode::X25519Mlkem768);
     }
+
+    #[test]
+    fn key_exchange_mode_serde_case_insensitive() {
+        let mode_lower = assert_ok!(serde_json::from_str::<KeyExchangeMode>(r#""x25519""#));
+        assert_eq!(mode_lower, KeyExchangeMode::X25519);
+
+        let mode_mlkem_lower = assert_ok!(serde_json::from_str::<KeyExchangeMode>(
+            r#""x25519mlkem768""#
+        ));
+        assert_eq!(mode_mlkem_lower, KeyExchangeMode::X25519Mlkem768);
+    }
 }

@@ -103,6 +103,7 @@ pub async fn read_payload<R: AsyncReadExt + Unpin>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use claims::assert_ok;
     use std::io::Cursor;
 
     #[test]
@@ -115,18 +116,38 @@ mod tests {
         assert_eq!(payload[299], 43);
     }
 
+    #[test]
+    fn generate_payload_empty() {
+        let payload = generate_payload(0);
+        assert_eq!(payload.len(), 0);
+    }
+
+    #[test]
+    fn generate_payload_chunk_boundary() {
+        let payload = generate_payload(64 * 1024);
+        assert_eq!(payload.len(), 65_536);
+        assert_eq!(payload[255], 0xFF);
+        assert_eq!(payload[256], 0x00);
+        assert_eq!(payload[65_535], 255);
+    }
+
+    #[test]
+    fn generate_payload_at_max_size() {
+        let payload = generate_payload(MAX_PAYLOAD_SIZE);
+        assert_eq!(payload.len(), 16_777_216);
+        assert_eq!(payload[255], 0xFF);
+        assert_eq!(payload[256], 0x00);
+        assert_eq!(payload[MAX_PAYLOAD_SIZE as usize - 1], 255);
+    }
+
     #[tokio::test]
     async fn roundtrip_request() {
         let mut buf = Vec::new();
-        write_request(&mut buf, 12345)
-            .await
-            .expect("write should succeed");
+        assert_ok!(write_request(&mut buf, 12_345).await);
         assert_eq!(buf.len(), REQUEST_SIZE);
 
         let mut cursor = Cursor::new(buf);
-        let size = read_request(&mut cursor)
-            .await
-            .expect("read should succeed");
+        let size = assert_ok!(read_request(&mut cursor).await);
         assert_eq!(size, 12345);
     }
 
@@ -136,5 +157,23 @@ mod tests {
         let mut cursor = Cursor::new(buf);
         let result = read_request(&mut cursor).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn read_payload_exact_size() {
+        let payload = generate_payload(500);
+        let mut cursor = Cursor::new(payload.clone());
+        let read = assert_ok!(read_payload(&mut cursor, 500).await);
+        assert_eq!(read, 500);
+    }
+
+    #[tokio::test]
+    async fn write_payload_chunk_boundary() {
+        let size = 64 * 1024;
+        let mut buf = Vec::new();
+        assert_ok!(write_payload(&mut buf, size as u64).await);
+        assert_eq!(buf.len(), size);
+        assert_eq!(buf[0], 0x00);
+        assert_eq!(buf[size - 1], 0xFF);
     }
 }
