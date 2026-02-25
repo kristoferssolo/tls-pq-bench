@@ -1,8 +1,3 @@
-//! Self-signed certificate generation for local testing.
-//!
-//! Generates a CA certificate and server certificate for TLS benchmarking.
-//! These certificates are NOT suitable for production use.
-
 use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, Issuer, KeyPair, SanType};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 

@@ -5,7 +5,7 @@ use crate::{
     config::utils::validate_config,
     error::{self, ConfigError},
 };
-use common::{self, KeyExchangeMode};
+use common::prelude::*;
 use miette::{NamedSource, SourceSpan};
 use serde::Deserialize;
 use std::{fs::read_to_string, net::SocketAddr, path::Path};

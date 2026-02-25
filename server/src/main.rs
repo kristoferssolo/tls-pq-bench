@@ -11,7 +11,7 @@ mod tls;
 use crate::{server::run_server, tls::build_tls_config};
 use base64::prelude::*;
 use clap::Parser;
-use common::{KeyExchangeMode, cert::CaCertificate};
+use common::{cert::CaCertificate, prelude::*};
 use std::{env, net::SocketAddr};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
@@ -72,7 +72,6 @@ async fn main() -> miette::Result<()> {
 mod tests {
     use super::*;
     use claims::assert_ok;
-    use common::cert::CaCertificate;
     use std::sync::Arc;
 
     #[test]

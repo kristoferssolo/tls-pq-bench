@@ -1,11 +1,3 @@
-//! Benchmark protocol implementation.
-//!
-//! Protocol specification:
-//! 1. Client sends 8-byte little-endian u64: requested payload size N
-//! 2. Server responds with exactly N bytes (deterministic pattern)
-//!
-//! The deterministic pattern is a repeating sequence of bytes 0x00..0xFF.
-
 // Casts are intentional: MAX_PAYLOAD_SIZE (16 MiB) fits in usize on 64-bit,
 // and byte patterns are explicitly masked to 0xFF before casting.
 #![allow(clippy::cast_possible_truncation)]

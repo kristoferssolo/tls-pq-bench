@@ -12,6 +12,12 @@ mod config;
 mod error;
 mod tls;
 
+use crate::{
+    args::Args,
+    bench::run_benchmark,
+    config::{load_from_cli, load_from_file},
+    tls::build_tls_config,
+};
 use clap::Parser;
 use miette::{Context, IntoDiagnostic};
 use rustls::pki_types::ServerName;
@@ -20,13 +26,6 @@ use tokio_rustls::TlsConnector;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 use uuid::Uuid;
-
-use crate::{
-    args::Args,
-    bench::run_benchmark,
-    config::{load_from_cli, load_from_file},
-    tls::build_tls_config,
-};
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
