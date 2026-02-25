@@ -11,7 +11,7 @@ use common::{
     BenchRecord, KeyExchangeMode,
     protocol::{read_payload, write_request},
 };
-use miette::miette;
+use miette::{Context, IntoDiagnostic};
 use runner::{
     args::Args,
     config::{load_from_cli, load_from_file},
@@ -106,7 +106,8 @@ fn build_tls_config(mode: KeyExchangeMode) -> miette::Result<Arc<ClientConfig>> 
 
     let config = ClientConfig::builder_with_provider(Arc::new(provider))
         .with_protocol_versions(&[&TLS13])
-        .map_err(|e| miette!("failed to set TLS versions: {e}"))?
+        .into_diagnostic()
+        .context("failed to set TLS versions")?
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(NoVerifier))
         .with_no_client_auth();
@@ -126,22 +127,26 @@ async fn run_iteration(
 
     let stream = TcpStream::connect(server)
         .await
-        .map_err(|e| miette!("TCP connection failed: {e}"))?;
+        .into_diagnostic()
+        .context("TCP connection failed")?;
 
     let mut tls_stream = tls_connector
         .connect(server_name.clone(), stream)
         .await
-        .map_err(|e| miette!("TLS handshake failed: {e}"))?;
+        .into_diagnostic()
+        .context("TLS handshake failed")?;
 
     let handshake_ns = start.elapsed().as_nanos() as u64;
 
     write_request(&mut tls_stream, u64::from(payload_bytes))
         .await
-        .map_err(|e| miette!("write request failed: {e}"))?;
+        .into_diagnostic()
+        .context("write request failed")?;
 
     read_payload(&mut tls_stream, u64::from(payload_bytes))
         .await
-        .map_err(|e| miette!("read payload failed: {e}"))?;
+        .into_diagnostic()
+        .context("read payload failed")?;
 
     let ttlb_ns = start.elapsed().as_nanos() as u64;
 
@@ -176,10 +181,12 @@ async fn run_benchmark(
             server_name.clone(),
             TcpStream::connect(server)
                 .await
-                .map_err(|e| miette!("failed to connect to server {}: {e}", server))?,
+                .into_diagnostic()
+                .context(format!("failed to connect to server {server}"))?,
         )
         .await
-        .map_err(|e| miette!("TLS handshake failed: {e}"))?;
+        .into_diagnostic()
+        .context("TLS handshake failed")?;
 
     let cipher = test_conn.get_ref().1.negotiated_cipher_suite();
     info!(cipher = ?cipher, "TLS handshake complete");
@@ -194,7 +201,8 @@ async fn run_benchmark(
         write_results(&mut output, tasks).await?;
         output
             .flush()
-            .map_err(|e| miette!("failed to flush output: {e}"))?;
+            .into_diagnostic()
+            .context("failed to flush output")?;
     }
 
     info!("benchmark complete");
@@ -270,7 +278,9 @@ async fn write_results<W: Write + Send>(
     for task in tasks {
         let (_result, record) = task.await.expect("task should not panic");
         if let Some(record) = record {
-            writeln!(output, "{record}").map_err(|e| miette!("failed to write record: {e}"))?;
+            writeln!(output, "{record}")
+                .into_diagnostic()
+                .context("failed to write record")?;
         }
     }
     Ok(())
@@ -308,7 +318,8 @@ async fn main() -> miette::Result<()> {
     let tls_connector = TlsConnector::from(tls_config);
 
     let server_name = ServerName::try_from("localhost".to_string())
-        .map_err(|e| miette!("invalid server name: {e}"))?;
+        .into_diagnostic()
+        .context("invalid server name")?;
 
     for benchmark in &config.benchmarks {
         info!(
