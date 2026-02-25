@@ -1,4 +1,4 @@
-#![allow(unused_assignments)]
+#![allow(unused)]
 //! Error types for the benchmark runner.
 
 use miette::{Diagnostic, NamedSource, SourceSpan};
