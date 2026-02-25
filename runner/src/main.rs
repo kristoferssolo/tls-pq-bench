@@ -200,7 +200,7 @@ async fn run_benchmark(
     Ok(())
 }
 
-type ReturnHandle = JoinHandle<(IterationResult, Option<BenchRecord>)>;
+type ReturnHandle = JoinHandle<miette::Result<BenchRecord>>;
 
 fn spawn_benchmark_tasks(
     config: &runner::config::BenchmarkConfig,
@@ -241,20 +241,16 @@ fn spawn_single_iteration(
             .await
             .expect("semaphore should not be closed");
 
-        let result = run_iteration(server, payload_bytes, &tls_connector, &server_name)
-            .await
-            .expect("iteration should not fail");
+        let result = run_iteration(server, payload_bytes, &tls_connector, &server_name).await?;
 
-        let record = BenchRecord {
+        Ok(BenchRecord {
             iteration: u64::from(i),
             mode,
             payload_bytes: u64::from(payload_bytes),
             tcp_ns: result.tcp,
             handshake_ns: result.handshake,
             ttlb_ns: result.ttlb,
-        };
-
-        (result, Some(record))
+        })
     })
 }
 
@@ -264,12 +260,10 @@ async fn write_results<W: Write + Send>(
     tasks: Vec<ReturnHandle>,
 ) -> miette::Result<()> {
     for task in tasks {
-        let (_result, record) = task.await.expect("task should not panic");
-        if let Some(record) = record {
-            writeln!(output, "{record}")
-                .into_diagnostic()
-                .context("failed to write record")?;
-        }
+        let record = task.await.into_diagnostic().context("task paniced")??;
+        writeln!(output, "{record}")
+            .into_diagnostic()
+            .context("failed to write record")?;
     }
     Ok(())
 }
