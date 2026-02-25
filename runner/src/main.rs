@@ -183,21 +183,6 @@ async fn run_benchmark(
     }
     info!("warmup complete");
 
-    let test_conn = tls_connector
-        .connect(
-            server_name.clone(),
-            TcpStream::connect(server)
-                .await
-                .into_diagnostic()
-                .context(format!("failed to connect to server {server}"))?,
-        )
-        .await
-        .into_diagnostic()
-        .context("TLS handshake failed")?;
-
-    let cipher = test_conn.get_ref().1.negotiated_cipher_suite();
-    info!(cipher = ?cipher, "TLS handshake complete");
-
     #[allow(clippy::cast_possible_truncation)] // concurrency is limited to reasonable values
     let semaphore = Arc::new(Semaphore::new(config.concurrency as usize));
     let tasks = spawn_benchmark_tasks(config, &semaphore, tls_connector, server_name);

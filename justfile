@@ -12,6 +12,7 @@ alias c := check
 alias d := docs
 alias f := fmt
 alias t := test
+alias bench := benchmark
 
 # Run all checks (fmt, clippy, docs, test)
 [group("dev")]
