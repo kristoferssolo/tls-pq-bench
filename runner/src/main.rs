@@ -14,7 +14,7 @@ use common::{
 use miette::{Context, IntoDiagnostic};
 use runner::{
     args::Args,
-    config::{load_from_cli, load_from_file},
+    config::{BenchmarkConfig, load_from_cli, load_from_file},
 };
 use rustls::{
     ClientConfig, DigitallySignedStruct, SignatureScheme,
@@ -97,7 +97,7 @@ impl ServerCertVerifier for NoVerifier {
 }
 
 /// Build TLS client config for the given key exchange mode.
-fn build_tls_config(mode: KeyExchangeMode) -> miette::Result<Arc<ClientConfig>> {
+fn build_tls_config(mode: KeyExchangeMode) -> miette::Result<ClientConfig> {
     let mut provider = aws_lc_rs::default_provider();
     provider.kx_groups = match mode {
         KeyExchangeMode::X25519 => vec![X25519],
@@ -112,7 +112,7 @@ fn build_tls_config(mode: KeyExchangeMode) -> miette::Result<Arc<ClientConfig>> 
         .with_custom_certificate_verifier(Arc::new(NoVerifier))
         .with_no_client_auth();
 
-    Ok(Arc::new(config))
+    Ok(config)
 }
 
 /// Run a single benchmark iteration over TLS.
@@ -156,9 +156,8 @@ async fn run_iteration(
     })
 }
 
-#[allow(clippy::future_not_send)] // References held across await points
 async fn run_benchmark(
-    config: &runner::config::BenchmarkConfig,
+    config: &BenchmarkConfig,
     tls_connector: &TlsConnector,
     server_name: &ServerName<'static>,
 ) -> miette::Result<()> {
@@ -195,7 +194,6 @@ async fn run_benchmark(
     let semaphore = Arc::new(Semaphore::new(config.concurrency as usize));
     let tasks = spawn_benchmark_tasks(config, &semaphore, tls_connector, server_name);
 
-    // Output to stdout for now
     {
         let mut output = stdout();
         write_results(&mut output, tasks).await?;
@@ -219,17 +217,13 @@ fn spawn_benchmark_tasks(
 ) -> Vec<ReturnHandle> {
     let server = config.server;
     let payload_bytes = config.payload;
-    let mode = config
-        .mode
-        .parse::<KeyExchangeMode>()
-        .expect("mode should be valid");
 
     (0..config.iters)
         .map(|i| {
             spawn_single_iteration(
                 i,
                 payload_bytes,
-                mode,
+                config.mode,
                 server,
                 semaphore.clone(),
                 tls_connector.clone(),
@@ -314,9 +308,6 @@ async fn main() -> miette::Result<()> {
         load_from_cli(&args)?
     };
 
-    let tls_config = build_tls_config(config.server_mode())?;
-    let tls_connector = TlsConnector::from(tls_config);
-
     let server_name = ServerName::try_from("localhost".to_string())
         .into_diagnostic()
         .context("invalid server name")?;
@@ -330,6 +321,9 @@ async fn main() -> miette::Result<()> {
             concurrency = benchmark.concurrency,
             "running benchmark"
         );
+
+        let tls_config = build_tls_config(benchmark.mode)?;
+        let tls_connector = TlsConnector::from(Arc::new(tls_config));
 
         run_benchmark(benchmark, &tls_connector, &server_name).await?;
     }

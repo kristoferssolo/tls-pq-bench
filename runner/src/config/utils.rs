@@ -2,7 +2,6 @@ use crate::{
     config::{BenchmarkConfig, Config},
     error::{self, ConfigError},
 };
-use common::{self, KeyExchangeMode};
 use miette::{NamedSource, SourceSpan};
 use std::path::Path;
 
@@ -30,21 +29,6 @@ fn validate_benchmark(
     path: &Path,
 ) -> error::Result<()> {
     let src = NamedSource::new(path.display().to_string(), content.to_string());
-
-    // Validate mode
-    if benchmark.mode.parse::<KeyExchangeMode>().is_err() {
-        return Err(ConfigError::ValidationError {
-            src,
-            span: find_field_span(content, idx, "mode"),
-            field: "mode".into(),
-            idx,
-            message: format!(
-                "Invalid key exchange mode '{}'. Valid values: 'x25519', 'x25519mlkem768'",
-                benchmark.mode
-            ),
-        }
-        .into());
-    }
 
     validate_positive_field(src.clone(), content, idx, "payload", benchmark.payload)?;
     validate_positive_field(src.clone(), content, idx, "iters", benchmark.iters)?;

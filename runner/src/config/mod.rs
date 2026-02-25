@@ -12,7 +12,7 @@ use std::{fs::read_to_string, net::SocketAddr, path::Path};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BenchmarkConfig {
-    pub mode: String,
+    pub mode: KeyExchangeMode,
     pub payload: u32,
     pub iters: u32,
     pub warmup: u32,
@@ -61,7 +61,7 @@ pub fn load_from_file(path: &Path) -> error::Result<Config> {
 pub fn load_from_cli(args: &Args) -> error::Result<Config> {
     Ok(Config {
         benchmarks: vec![BenchmarkConfig {
-            mode: args.mode.to_string(),
+            mode: args.mode,
             payload: args.payload_bytes,
             iters: args.iters,
             warmup: args.warmup,
@@ -73,21 +73,10 @@ pub fn load_from_cli(args: &Args) -> error::Result<Config> {
     })
 }
 
-impl Config {
-    /// Get the key exchange mode from the first benchmark configuration.
-    #[must_use]
-    pub fn server_mode(&self) -> KeyExchangeMode {
-        self.benchmarks
-            .first()
-            .and_then(|b| b.mode.parse().ok())
-            .unwrap_or(KeyExchangeMode::X25519)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use claims::assert_ok;
+    use claims::{assert_err, assert_ok, assert_some};
 
     const VALID_CONFIG: &str = r#"
 [[benchmarks]]
@@ -124,7 +113,7 @@ server = "127.0.0.1:4433"
 "#;
         let config = get_config_from_str(toml);
         assert_eq!(config.benchmarks.len(), 1);
-        assert_eq!(config.benchmarks[0].mode, "x25519");
+        assert_eq!(config.benchmarks[0].mode, KeyExchangeMode::X25519);
         assert_eq!(config.benchmarks[0].payload, 1024);
     }
 
@@ -132,8 +121,8 @@ server = "127.0.0.1:4433"
     fn valid_multiple_benchmarks() {
         let config = get_config_from_str(VALID_CONFIG);
         assert_eq!(config.benchmarks.len(), 2);
-        assert_eq!(config.benchmarks[0].mode, "x25519");
-        assert_eq!(config.benchmarks[1].mode, "x25519mlkem768");
+        assert_eq!(config.benchmarks[0].mode, KeyExchangeMode::X25519);
+        assert_eq!(config.benchmarks[1].mode, KeyExchangeMode::X25519Mlkem768);
     }
 
     #[test]
@@ -147,8 +136,7 @@ warmup = 10
 concurrency = 1
 server = "127.0.0.1:4433"
 "#;
-        let config = get_config_from_str(toml);
-        assert!(config.server_mode() == KeyExchangeMode::X25519); // fallback
+        assert_err!(toml::from_str::<Config>(toml));
     }
 
     #[test]
@@ -163,8 +151,7 @@ concurrency = 1
 server = "127.0.0.1:4433"
 "#;
         let config = get_config_from_str(toml);
-        let result = validate_config(&config, toml, std::path::Path::new("test.toml"));
-        assert!(result.is_err());
+        assert_err!(validate_config(&config, toml, Path::new("test.toml")));
     }
 
     #[test]
@@ -179,8 +166,7 @@ concurrency = 1
 server = "127.0.0.1:4433"
 "#;
         let config = get_config_from_str(toml);
-        let result = validate_config(&config, toml, std::path::Path::new("test.toml"));
-        assert!(result.is_err());
+        assert_err!(validate_config(&config, toml, Path::new("test.toml")));
     }
 
     #[test]
@@ -195,8 +181,7 @@ concurrency = 0
 server = "127.0.0.1:4433"
 "#;
         let config = get_config_from_str(toml);
-        let result = validate_config(&config, toml, std::path::Path::new("test.toml"));
-        assert!(result.is_err());
+        assert_err!(validate_config(&config, toml, Path::new("test.toml")));
     }
 
     #[test]
@@ -218,7 +203,8 @@ concurrency = 1
 server = "127.0.0.1:4433"
 "#;
         let config = get_config_from_str(toml);
-        assert_eq!(config.server_mode(), KeyExchangeMode::X25519);
+        let benchmark = assert_some!(config.benchmarks.first());
+        assert_eq!(benchmark.mode, KeyExchangeMode::X25519);
     }
 
     #[test]
@@ -233,6 +219,7 @@ concurrency = 1
 server = "127.0.0.1:4433"
 "#;
         let config = get_config_from_str(toml);
-        assert_eq!(config.server_mode(), KeyExchangeMode::X25519Mlkem768);
+        let benchmark = assert_some!(config.benchmarks.first());
+        assert_eq!(benchmark.mode, KeyExchangeMode::X25519Mlkem768);
     }
 }
