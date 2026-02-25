@@ -29,10 +29,12 @@ pub struct BenchRecord {
     pub mode: KeyExchangeMode,
     /// Payload size in bytes
     pub payload_bytes: u64,
+    /// TCP connection latency in nanoseconds
+    pub tcp_ns: u128,
     /// Handshake latency in nanoseconds
-    pub handshake_ns: u64,
+    pub handshake_ns: u128,
     /// Time-to-last-byte in nanoseconds (from connection start)
-    pub ttlb_ns: u64,
+    pub ttlb_ns: u128,
 }
 
 impl BenchRecord {
@@ -56,10 +58,9 @@ impl fmt::Display for BenchRecord {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use claims::{assert_err, assert_ok};
     use serde_json::Value;
-
-    use super::*;
     use std::str::FromStr;
 
     #[test]
@@ -68,6 +69,7 @@ mod tests {
             iteration: 0,
             mode: KeyExchangeMode::X25519,
             payload_bytes: 1024,
+            tcp_ns: 500_000,
             handshake_ns: 1_000_000,
             ttlb_ns: 2_000_000,
         };
@@ -83,6 +85,7 @@ mod tests {
             iteration: 42,
             mode: KeyExchangeMode::X25519Mlkem768,
             payload_bytes: 4096,
+            tcp_ns: 1_000_000,
             handshake_ns: 5_000_000,
             ttlb_ns: 10_000_000,
         };

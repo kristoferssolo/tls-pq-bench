@@ -42,8 +42,9 @@ use uuid::Uuid;
 
 /// Result of a single benchmark iteration.
 struct IterationResult {
-    handshake_ns: u64,
-    ttlb_ns: u64,
+    tcp: u128,
+    handshake: u128,
+    ttlb: u128,
 }
 
 /// Certificate verifier that accepts any certificate.
@@ -119,28 +120,31 @@ fn build_tls_config(mode: KeyExchangeMode) -> miette::Result<ClientConfig> {
 }
 
 /// Run a single benchmark iteration over TLS.
-#[allow(clippy::cast_possible_truncation)] // nanoseconds won't overflow u64 for reasonable durations
 async fn run_iteration(
     server: SocketAddr,
     payload_bytes: u32,
     tls_connector: &TlsConnector,
     server_name: &ServerName<'static>,
 ) -> miette::Result<IterationResult> {
-    let start = Instant::now();
+    let tcp_start = Instant::now();
 
     let stream = TcpStream::connect(server)
         .await
         .into_diagnostic()
         .context("TCP connection failed")?;
 
+    let tcp_ns = tcp_start.elapsed().as_nanos();
+
+    let hs_start = Instant::now();
     let mut tls_stream = tls_connector
         .connect(server_name.clone(), stream)
         .await
         .into_diagnostic()
         .context("TLS handshake failed")?;
 
-    let handshake_ns = start.elapsed().as_nanos() as u64;
+    let handshake_ns = hs_start.elapsed().as_nanos();
 
+    let ttlb_start = Instant::now();
     write_request(&mut tls_stream, u64::from(payload_bytes))
         .await
         .into_diagnostic()
@@ -151,11 +155,12 @@ async fn run_iteration(
         .into_diagnostic()
         .context("read payload failed")?;
 
-    let ttlb_ns = start.elapsed().as_nanos() as u64;
+    let ttlb_ns = tcp_ns + handshake_ns + ttlb_start.elapsed().as_nanos();
 
     Ok(IterationResult {
-        handshake_ns,
-        ttlb_ns,
+        tcp: tcp_ns,
+        handshake: handshake_ns,
+        ttlb: ttlb_ns,
     })
 }
 
@@ -259,8 +264,9 @@ fn spawn_single_iteration(
             iteration: u64::from(i),
             mode,
             payload_bytes: u64::from(payload_bytes),
-            handshake_ns: result.handshake_ns,
-            ttlb_ns: result.ttlb_ns,
+            tcp_ns: result.tcp,
+            handshake_ns: result.handshake,
+            ttlb_ns: result.ttlb,
         };
 
         (result, Some(record))
