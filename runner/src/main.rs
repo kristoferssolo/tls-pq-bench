@@ -19,6 +19,7 @@ use runner::{
 use rustls::{
     ClientConfig, DigitallySignedStruct, SignatureScheme,
     client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
+    compress::CompressionCache,
     crypto::aws_lc_rs::{
         self,
         kx_group::{X25519, X25519MLKEM768},
@@ -104,13 +105,15 @@ fn build_tls_config(mode: KeyExchangeMode) -> miette::Result<ClientConfig> {
         KeyExchangeMode::X25519Mlkem768 => vec![X25519MLKEM768],
     };
 
-    let config = ClientConfig::builder_with_provider(Arc::new(provider))
+    let mut config = ClientConfig::builder_with_provider(Arc::new(provider))
         .with_protocol_versions(&[&TLS13])
         .into_diagnostic()
         .context("failed to set TLS versions")?
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(NoVerifier))
         .with_no_client_auth();
+
+    config.cert_compression_cache = Arc::new(CompressionCache::Disabled);
 
     Ok(config)
 }
