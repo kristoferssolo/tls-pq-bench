@@ -5,7 +5,7 @@ use miette::{Diagnostic, NamedSource, SourceSpan};
 use std::path::PathBuf;
 use thiserror::Error;
 
-/// Result type using the runner's custom error type.
+/// Result type using the `runner`'s custom error type.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Errors that can occur during benchmark execution.

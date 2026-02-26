@@ -42,6 +42,7 @@ pub async fn write_request<W: AsyncWriteExt + Unpin>(writer: &mut W, size: u64) 
 /// Generate deterministic payload of the given size.
 ///
 /// The pattern is a repeating sequence: 0x00, 0x01, ..., 0xFF, 0x00, ...
+#[inline]
 #[must_use]
 pub fn generate_payload(size: u64) -> Vec<u8> {
     (0..size).map(|i| (i & 0xFF) as u8).collect()

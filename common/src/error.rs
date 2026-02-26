@@ -1,7 +1,7 @@
 use miette::Diagnostic;
 use thiserror::Error;
 
-/// Result type using the common's custom error type.
+/// Result type using the `common`'s custom error type.
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error, Diagnostic)]

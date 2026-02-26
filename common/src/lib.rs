@@ -1,5 +1,3 @@
-//! Common types and utilities for the TLS benchmark harness
-
 pub mod cert;
 pub mod error;
 pub mod prelude;
@@ -10,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use strum::{Display, EnumString};
 
-/// TLS key exchange mode
+/// TLS 1.3 key exchange mode used for benchmark runs
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString, Display)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -19,6 +17,23 @@ pub enum KeyExchangeMode {
     X25519,
     /// Hybrid post-quantum: X25519 + ML-KEM-768.
     X25519Mlkem768,
+}
+
+/// Application protocol carried over TLS in benchmark runs.
+///
+/// `Raw` is a minimal custom framing protocol (8-byte LE length request, then N payload bytes)
+/// used for low-overhead microbenchmarks.
+///
+/// `Http1` is an HTTP/1.1 request/response mode (`GET /bytes/{n}`) used for realism-oriented
+/// comparisons where HTTP parsing and headers are part of measured overhead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString, Display)]
+#[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum ProtocolMode {
+    /// Minimal custom framing protocol for primary microbenchmarks.
+    Raw,
+    /// HTTP/1.1 mode for realism-oriented comparisons.
+    Http1,
 }
 
 /// A single benchmark measurement record, output as NDJSON

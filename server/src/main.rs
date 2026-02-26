@@ -20,11 +20,15 @@ use tracing_subscriber::EnvFilter;
 #[derive(Debug, Parser)]
 #[command(name = "server", version, about)]
 struct Args {
-    /// Key exchange mode.
+    /// Key exchange mode
     #[arg(long, default_value = "x25519")]
     mode: KeyExchangeMode,
 
-    /// Address to listen on.
+    /// Protocol carrier
+    #[arg(long, default_value = "raw")]
+    pub proto: ProtocolMode,
+
+    /// Address to listen on
     #[arg(long, default_value = "127.0.0.1:4433")]
     listen: SocketAddr,
 }
@@ -65,7 +69,7 @@ async fn main() -> miette::Result<()> {
         "CA cert (truncated)"
     );
 
-    Ok(run_server(args, tls_config).await?)
+    Ok(run_server(&args, tls_config).await?)
 }
 
 #[cfg(test)]

@@ -1,15 +1,15 @@
-use crate::{Args, error};
 use common::prelude::*;
 use rustls::{ServerConfig, server::Acceptor};
 use std::{io::ErrorKind, net::SocketAddr, sync::Arc};
-use tokio::{
-    io::AsyncWriteExt,
-    net::{TcpListener, TcpStream},
-};
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 use tokio_rustls::LazyConfigAcceptor;
 use tracing::{debug, info, warn};
 
-pub async fn handle_connection(stream: TcpStream, peer: SocketAddr, tls_config: Arc<ServerConfig>) {
+pub async fn handle_raw_connection(
+    stream: TcpStream,
+    peer: SocketAddr,
+    tls_config: Arc<ServerConfig>,
+) {
     let acceptor = LazyConfigAcceptor::new(Acceptor::default(), stream);
     let start_handshake = match acceptor.await {
         Ok(sh) => sh,
@@ -55,26 +55,5 @@ pub async fn handle_connection(stream: TcpStream, peer: SocketAddr, tls_config: 
             warn!(peer = %peer, error = %e, "flush error");
             break;
         }
-    }
-}
-
-pub async fn run_server(args: Args, tls_config: Arc<ServerConfig>) -> error::Result<()> {
-    let listener = TcpListener::bind(args.listen)
-        .await
-        .map_err(|e| error::Error::network(format!("failed to bind to {}: {e}", args.listen)))?;
-
-    info!(listen = %args.listen, mode = %args.mode, "listening");
-
-    loop {
-        let (stream, peer) = match listener.accept().await {
-            Ok(conn) => conn,
-            Err(e) => {
-                error!(error = %e, "accept error");
-                continue;
-            }
-        };
-
-        let config = tls_config.clone();
-        tokio::spawn(handle_connection(stream, peer, config));
     }
 }

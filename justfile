@@ -66,10 +66,11 @@ server mode="x25519" listen="127.0.0.1:4433":
 
 # Run benchmark runner
 [group("run")]
-runner server mode="x25519" payload="1024" iters="100" warmup="10":
+runner server mode="x25519" proto="raw" payload="1024" iters="100" warmup="10":
     cargo run --release --bin runner -- \
         --server {{server}} \
         --mode {{mode}} \
+        --proto {{proto}} \
         --payload-bytes {{payload}} \
         --iters {{iters}} \
         --warmup {{warmup}}
