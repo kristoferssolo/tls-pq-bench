@@ -61,16 +61,15 @@ setup:
 
 # Run server (default: x25519 on localhost:4433)
 [group("run")]
-server mode="x25519" listen="127.0.0.1:4433":
-    cargo run --release --bin server -- --mode {{mode}} --listen {{listen}}
+server mode="x25519" proto="raw" listen="127.0.0.1:4433":
+    cargo run --release --bin server -- --mode {{mode}} --proto {{proto}} --listen {{listen}}
 
 # Run benchmark runner
 [group("run")]
-runner server mode="x25519" proto="raw" payload="1024" iters="100" warmup="10":
+runner server mode="x25519" payload="1024" iters="100" warmup="10":
     cargo run --release --bin runner -- \
         --server {{server}} \
         --mode {{mode}} \
-        --proto {{proto}} \
         --payload-bytes {{payload}} \
         --iters {{iters}} \
         --warmup {{warmup}}

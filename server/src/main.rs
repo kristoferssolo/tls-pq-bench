@@ -26,7 +26,7 @@ struct Args {
 
     /// Protocol carrier
     #[arg(long, default_value = "raw")]
-    pub proto: ProtocolMode,
+    proto: ProtocolMode,
 
     /// Address to listen on
     #[arg(long, default_value = "127.0.0.1:4433")]
@@ -49,6 +49,7 @@ async fn main() -> miette::Result<()> {
         command = env::args().collect::<Vec<_>>().join(" "),
         listen = %args.listen,
         mode = %args.mode,
+        proto = %args.proto,
         "server started"
     );
 
@@ -82,6 +83,7 @@ mod tests {
     fn default_args() {
         let args = Args::parse_from(["server"]);
         assert_eq!(args.mode, KeyExchangeMode::X25519);
+        assert_eq!(args.proto, ProtocolMode::Raw);
         assert_eq!(args.listen.to_string(), "127.0.0.1:4433");
     }
 

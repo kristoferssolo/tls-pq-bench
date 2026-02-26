@@ -6,8 +6,12 @@ edition.workspace = true
 
 [dependencies]
 base64.workspace = true
+bytes.workspace = true
 clap.workspace = true
 common.workspace = true
+http-body-util.workspace = true
+hyper-util = { workspace = true, features = ["server"] }
+hyper = { workspace = true, features = ["server"] }
 miette.workspace = true
 rustls.workspace = true
 thiserror.workspace = true

@@ -13,8 +13,12 @@ common = { path = "common" }
 
 aws-lc-rs = "1"
 base64 = "0.22"
+bytes = "1.11"
 clap = { version = "4.5", features = ["derive"] }
 futures = "0.3"
+http-body-util = "0.1"
+hyper = { version = "1.8", features = ["http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
 miette = { version = "7", features = ["fancy"] }
 rcgen = "0.14"
 rustls = { version = "0.23", default-features = false, features = [

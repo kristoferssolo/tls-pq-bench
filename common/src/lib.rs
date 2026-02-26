@@ -3,18 +3,20 @@ pub mod error;
 pub mod prelude;
 pub mod protocol;
 
+use clap::ValueEnum;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use strum::{Display, EnumString};
+use strum::Display;
 
 /// TLS 1.3 key exchange mode used for benchmark runs
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum KeyExchangeMode {
     /// Classical X25519 ECDH.
     X25519,
+    #[value(name = "x25519mlkem768")]
     /// Hybrid post-quantum: X25519 + ML-KEM-768.
     X25519Mlkem768,
 }
@@ -26,7 +28,7 @@ pub enum KeyExchangeMode {
 ///
 /// `Http1` is an HTTP/1.1 request/response mode (`GET /bytes/{n}`) used for realism-oriented
 /// comparisons where HTTP parsing and headers are part of measured overhead.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum ProtocolMode {
@@ -77,7 +79,6 @@ mod tests {
     use super::*;
     use claims::{assert_err, assert_ok};
     use serde_json::Value;
-    use std::str::FromStr;
 
     #[test]
     fn bench_record_serializes_to_ndjson() {
@@ -117,18 +118,18 @@ mod tests {
 
     #[test]
     fn key_exchange_mode_from_str() {
-        let mode = assert_ok!(KeyExchangeMode::from_str("x25519"));
+        let mode = assert_ok!(KeyExchangeMode::from_str("x25519", true));
         assert_eq!(mode, KeyExchangeMode::X25519);
 
-        let mode = assert_ok!(KeyExchangeMode::from_str("x25519mlkem768"));
+        let mode = assert_ok!(KeyExchangeMode::from_str("x25519mlkem768", true));
         assert_eq!(mode, KeyExchangeMode::X25519Mlkem768);
     }
 
     #[test]
     fn key_exchange_mode_parse_error() {
-        assert_err!(KeyExchangeMode::from_str("invalid"));
-        assert_err!(KeyExchangeMode::from_str("x25519invalid"));
-        assert_err!(KeyExchangeMode::from_str(""));
+        assert_err!(KeyExchangeMode::from_str("invalid", true));
+        assert_err!(KeyExchangeMode::from_str("x25519invalid", true));
+        assert_err!(KeyExchangeMode::from_str("", true));
     }
 
     #[test]
