@@ -86,7 +86,7 @@ impl TryFrom<Args> for Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use claims::{assert_err, assert_ok, assert_some};
+    use claims::{assert_err, assert_ok};
 
     const VALID_CONFIG: &str = r#"
 [[benchmarks]]
@@ -134,8 +134,13 @@ server = "127.0.0.1:4433"
     fn valid_multiple_benchmarks() {
         let config = get_config_from_str(VALID_CONFIG);
         assert_eq!(config.benchmarks.len(), 2);
-        assert_eq!(config.benchmarks[0].mode, KeyExchangeMode::X25519);
-        assert_eq!(config.benchmarks[1].mode, KeyExchangeMode::X25519Mlkem768);
+        let bench_0 = config.benchmarks[0].clone();
+        let bench_1 = config.benchmarks[1].clone();
+
+        assert_eq!(bench_0.mode, KeyExchangeMode::X25519);
+        assert_eq!(bench_0.proto, ProtocolMode::Raw);
+        assert_eq!(bench_1.mode, KeyExchangeMode::X25519Mlkem768);
+        assert_eq!(bench_1.proto, ProtocolMode::Http1);
     }
 
     #[test]
@@ -221,39 +226,5 @@ server = "127.0.0.1:4433"
         let toml = "benchmarks = []";
         let config = get_config_from_str(toml);
         assert!(config.benchmarks.is_empty());
-    }
-
-    #[test]
-    fn server_mode_fallback() {
-        let toml = r#"
-[[benchmarks]]
-proto = "raw"
-mode = "x25519"
-payload = 1024
-iters = 100
-warmup = 10
-concurrency = 1
-server = "127.0.0.1:4433"
-"#;
-        let config = get_config_from_str(toml);
-        let benchmark = assert_some!(config.benchmarks.first());
-        assert_eq!(benchmark.mode, KeyExchangeMode::X25519);
-    }
-
-    #[test]
-    fn server_mode_mlkem() {
-        let toml = r#"
-[[benchmarks]]
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 1024
-iters = 100
-warmup = 10
-concurrency = 1
-server = "127.0.0.1:4433"
-"#;
-        let config = get_config_from_str(toml);
-        let benchmark = assert_some!(config.benchmarks.first());
-        assert_eq!(benchmark.mode, KeyExchangeMode::X25519Mlkem768);
     }
 }

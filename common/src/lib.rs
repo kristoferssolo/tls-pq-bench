@@ -43,6 +43,8 @@ pub enum ProtocolMode {
 pub struct BenchRecord {
     /// Iteration number (0-indexed, excludes warmup)
     pub iteration: u64,
+    /// Protocol carrier mode
+    pub proto: ProtocolMode,
     /// Key exchange mode used
     pub mode: KeyExchangeMode,
     /// Payload size in bytes
@@ -84,6 +86,7 @@ mod tests {
     fn bench_record_serializes_to_ndjson() {
         let record = BenchRecord {
             iteration: 0,
+            proto: ProtocolMode::Raw,
             mode: KeyExchangeMode::X25519,
             payload_bytes: 1024,
             tcp_ns: 500_000,
@@ -92,6 +95,7 @@ mod tests {
         };
         let json = assert_ok!(record.to_ndjson());
         assert!(json.contains(r#""iteration":0"#));
+        assert!(json.contains(r#""proto":"raw""#));
         assert!(json.contains(r#""mode":"x25519""#));
         assert!(json.contains(r#""payload_bytes":1024"#));
     }
@@ -100,6 +104,7 @@ mod tests {
     fn bench_record_roundtrip() {
         let original = BenchRecord {
             iteration: 42,
+            proto: ProtocolMode::Http1,
             mode: KeyExchangeMode::X25519Mlkem768,
             payload_bytes: 4096,
             tcp_ns: 1_000_000,
@@ -110,19 +115,11 @@ mod tests {
         let deserialized = assert_ok!(serde_json::from_str::<BenchRecord>(&json));
 
         assert_eq!(original.iteration, deserialized.iteration);
+        assert_eq!(original.proto, deserialized.proto);
         assert_eq!(original.mode, deserialized.mode);
         assert_eq!(original.payload_bytes, deserialized.payload_bytes);
         assert_eq!(original.handshake_ns, deserialized.handshake_ns);
         assert_eq!(original.ttlb_ns, deserialized.ttlb_ns);
-    }
-
-    #[test]
-    fn key_exchange_mode_from_str() {
-        let mode = assert_ok!(KeyExchangeMode::from_str("x25519", true));
-        assert_eq!(mode, KeyExchangeMode::X25519);
-
-        let mode = assert_ok!(KeyExchangeMode::from_str("x25519mlkem768", true));
-        assert_eq!(mode, KeyExchangeMode::X25519Mlkem768);
     }
 
     #[test]
@@ -151,5 +148,39 @@ mod tests {
             r#""x25519mlkem768""#
         ));
         assert_eq!(mode_mlkem_lower, KeyExchangeMode::X25519Mlkem768);
+    }
+
+    #[test]
+    fn key_protocol_mod_from_str() {
+        let proto = assert_ok!(ProtocolMode::from_str("raw", true));
+        assert_eq!(proto, ProtocolMode::Raw);
+
+        let proto = assert_ok!(ProtocolMode::from_str("http1", true));
+        assert_eq!(proto, ProtocolMode::Http1);
+    }
+
+    #[test]
+    fn key_protocol_mode_parse_error() {
+        assert_err!(ProtocolMode::from_str("invalid", true));
+        assert_err!(ProtocolMode::from_str("", true));
+    }
+
+    #[test]
+    fn key_exchange_mode_from_str() {
+        let mode = assert_ok!(KeyExchangeMode::from_str("x25519", true));
+        assert_eq!(mode, KeyExchangeMode::X25519);
+
+        let mode = assert_ok!(KeyExchangeMode::from_str("x25519mlkem768", true));
+        assert_eq!(mode, KeyExchangeMode::X25519Mlkem768);
+    }
+
+    #[test]
+    fn key_protocol_mode_serde() {
+        let json = r#"{"proto":"http1"}"#;
+        let value = assert_ok!(serde_json::from_str::<Value>(json));
+        let proto = assert_ok!(serde_json::from_value::<ProtocolMode>(
+            value["proto"].clone()
+        ));
+        assert_eq!(proto, ProtocolMode::Http1);
     }
 }
