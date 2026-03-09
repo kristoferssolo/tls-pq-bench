@@ -12,6 +12,7 @@ use std::{fs::read_to_string, net::SocketAddr, path::Path};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BenchmarkConfig {
+    pub proto: ProtocolMode,
     pub mode: KeyExchangeMode,
     pub payload: u32,
     pub iters: u32,
@@ -29,48 +30,57 @@ pub struct Config {
 ///
 /// # Errors
 /// Returns an error if the file cannot be read or parsed.
-pub fn load_from_file(path: &Path) -> error::Result<Config> {
-    let content = read_to_string(path).map_err(|source| ConfigError::ReadError {
-        source,
-        path: path.to_owned(),
-    })?;
+impl TryFrom<&Path> for Config {
+    type Error = error::Error;
 
-    let src = NamedSource::new(path.display().to_string(), content.clone());
-
-    let config = toml::from_str::<Config>(&content).map_err(|source| {
-        let span = source
-            .span()
-            .map(|s| SourceSpan::new(s.start.into(), s.end - s.start));
-
-        ConfigError::TomlParseError {
-            src: src.clone(),
-            span,
+    fn try_from(path: &Path) -> Result<Self, Self::Error> {
+        let content = read_to_string(path).map_err(|source| ConfigError::ReadError {
             source,
-        }
-    })?;
+            path: path.to_owned(),
+        })?;
 
-    validate_config(&config, &content, path)?;
+        let src = NamedSource::new(path.display().to_string(), content.clone());
 
-    Ok(config)
+        let config = toml::from_str::<Self>(&content).map_err(|source| {
+            let span = source
+                .span()
+                .map(|s| SourceSpan::new(s.start.into(), s.end - s.start));
+
+            ConfigError::TomlParseError {
+                src: src.clone(),
+                span,
+                source,
+            }
+        })?;
+
+        validate_config(&config, &content, path)?;
+
+        Ok(config)
+    }
 }
 
 /// Create benchmark configuration from CLI arguments.
 ///
 /// # Errors
-/// Never returns an error, but returns Result for consistency.
-pub fn load_from_cli(args: &Args) -> error::Result<Config> {
-    Ok(Config {
-        benchmarks: vec![BenchmarkConfig {
-            mode: args.mode,
-            payload: args.payload_bytes,
-            iters: args.iters,
-            warmup: args.warmup,
-            concurrency: args.concurrency,
-            server: args
-                .server
-                .ok_or_else(|| common::Error::config("--server ir required"))?,
-        }],
-    })
+/// Returns an error if `--server` was not provided.
+impl TryFrom<Args> for Config {
+    type Error = error::Error;
+
+    fn try_from(args: Args) -> Result<Self, Self::Error> {
+        Ok(Self {
+            benchmarks: vec![BenchmarkConfig {
+                proto: args.proto,
+                mode: args.mode,
+                payload: args.payload_bytes,
+                iters: args.iters,
+                warmup: args.warmup,
+                concurrency: args.concurrency,
+                server: args
+                    .server
+                    .ok_or_else(|| common::Error::config("--server is required"))?,
+            }],
+        })
+    }
 }
 
 #[cfg(test)]
@@ -80,6 +90,7 @@ mod tests {
 
     const VALID_CONFIG: &str = r#"
 [[benchmarks]]
+proto = "raw"
 mode = "x25519"
 payload = 1024
 iters = 100
@@ -88,6 +99,7 @@ concurrency = 1
 server = "127.0.0.1:4433"
 
 [[benchmarks]]
+proto = "http1"
 mode = "x25519mlkem768"
 payload = 4096
 iters = 50
@@ -104,6 +116,7 @@ server = "127.0.0.1:4433"
     fn valid_single_benchmark() {
         let toml = r#"
 [[benchmarks]]
+proto = "raw"
 mode = "x25519"
 payload = 1024
 iters = 100
@@ -126,9 +139,25 @@ server = "127.0.0.1:4433"
     }
 
     #[test]
+    fn invalid_proto() {
+        let toml = r#"
+[[benchmarks]]
+proto = "invalid_proto"
+mode = "x25519"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+"#;
+        assert_err!(toml::from_str::<Config>(toml));
+    }
+
+    #[test]
     fn invalid_mode() {
         let toml = r#"
 [[benchmarks]]
+proto = "raw"
 mode = "invalid_mode"
 payload = 1024
 iters = 100
@@ -143,6 +172,7 @@ server = "127.0.0.1:4433"
     fn payload_zero_validation() {
         let toml = r#"
 [[benchmarks]]
+proto = "raw"
 mode = "x25519"
 payload = 0
 iters = 100
@@ -158,6 +188,7 @@ server = "127.0.0.1:4433"
     fn iters_zero_validation() {
         let toml = r#"
 [[benchmarks]]
+proto = "raw"
 mode = "x25519"
 payload = 1024
 iters = 0
@@ -173,6 +204,7 @@ server = "127.0.0.1:4433"
     fn concurrency_zero_validation() {
         let toml = r#"
 [[benchmarks]]
+proto = "raw"
 mode = "x25519"
 payload = 1024
 iters = 100
@@ -195,6 +227,7 @@ server = "127.0.0.1:4433"
     fn server_mode_fallback() {
         let toml = r#"
 [[benchmarks]]
+proto = "raw"
 mode = "x25519"
 payload = 1024
 iters = 100
@@ -211,6 +244,7 @@ server = "127.0.0.1:4433"
     fn server_mode_mlkem() {
         let toml = r#"
 [[benchmarks]]
+proto = "raw"
 mode = "x25519mlkem768"
 payload = 1024
 iters = 100

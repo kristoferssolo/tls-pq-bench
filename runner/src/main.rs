@@ -12,12 +12,7 @@ mod config;
 mod error;
 mod tls;
 
-use crate::{
-    args::Args,
-    bench::run_benchmark,
-    config::{load_from_cli, load_from_file},
-    tls::build_tls_config,
-};
+use crate::{args::Args, bench::run_benchmark, config::Config, tls::build_tls_config};
 use clap::Parser;
 use miette::{Context, IntoDiagnostic};
 use rustls::pki_types::ServerName;
@@ -47,12 +42,12 @@ async fn main() -> miette::Result<()> {
 
     let args = Args::parse();
 
-    let config = if let Some(config_path) = &args.config {
+    let config: Config = if let Some(config_path) = &args.config {
         info!(config_file = %config_path.display(), "loading config from file");
-        load_from_file(config_path)?
+        config_path.as_path().try_into()?
     } else {
         info!("using CLI arguments");
-        load_from_cli(&args)?
+        args.try_into()?
     };
 
     let server_name = ServerName::try_from("localhost".to_string())
@@ -61,6 +56,7 @@ async fn main() -> miette::Result<()> {
 
     for benchmark in &config.benchmarks {
         info!(
+            proto = %benchmark.proto,
             mode = %benchmark.mode,
             payload = benchmark.payload,
             iters = benchmark.iters,

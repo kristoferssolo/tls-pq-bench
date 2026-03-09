@@ -43,22 +43,23 @@ cargo build --release
 Terminal 1 - Start server:
 
 ```bash
-./target/release/server --mode x25519 --listen 127.0.0.1:4433
+./target/release/server --mode x25519 --proto raw --listen 127.0.0.1:4433
 ```
 
 Terminal 2 - Run benchmark:
 
 ```bash
-./target/release/runner --server 127.0.0.1:4433 --mode x25519 --iters 100 --warmup 10
+./target/release/runner --server 127.0.0.1:4433 --proto raw --mode x25519 --iters 100 --warmup 10
 ```
 
 ### Run Matrix Benchmarks
 
-Create a config file (`matrix.toml`):
+Create a config file (`benchmarks.toml`):
 
 ```toml
 [[benchmarks]]
 server = "127.0.0.1:4433"
+proto = "raw"
 mode = "x25519"
 payload = 1024
 iters = 100
@@ -67,6 +68,7 @@ concurrency = 1
 
 [[benchmarks]]
 server = "127.0.0.1:4433"
+proto = "http1"
 mode = "x25519mlkem768"
 payload = 1024
 iters = 100

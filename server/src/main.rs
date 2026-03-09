@@ -24,7 +24,7 @@ struct Args {
     #[arg(long, default_value = "x25519")]
     mode: KeyExchangeMode,
 
-    /// Protocol carrier
+    /// Protocol carrier mode
     #[arg(long, default_value = "raw")]
     proto: ProtocolMode,
 

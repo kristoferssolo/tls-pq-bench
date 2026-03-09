@@ -6,7 +6,11 @@ use std::{net::SocketAddr, path::PathBuf};
 #[derive(Debug, Parser)]
 #[command(name = "runner", version, about)]
 pub struct Args {
-    /// Key exchange mode.
+    /// Protocol carrier mode
+    #[arg(long, default_value = "raw")]
+    pub proto: ProtocolMode,
+
+    /// Key exchange mode
     #[arg(long, default_value = "x25519")]
     pub mode: KeyExchangeMode,
 
