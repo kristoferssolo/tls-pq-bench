@@ -228,7 +228,7 @@ where
 
     let body_already_read = response_buf.len() - body_start;
     if body_already_read > content_length {
-        return Err(common::Error::protocol("http1 body exceeded content-lenght").into());
+        return Err(common::Error::protocol("http1 body exceeded content-length").into());
     }
 
     let mut remaining = content_length - body_already_read;
@@ -360,5 +360,87 @@ mod tests {
         let response = b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nbody";
         let pos = assert_some!(find_headers_end(response));
         assert_eq!(pos, 34);
+    }
+
+    #[tokio::test]
+    async fn run_http1_exchange_accepts_bytes_read_full_body() {
+        let (mut client, mut server) = tokio::io::duplex(4096);
+
+        let server_task = tokio::spawn(async move {
+            let mut req = [0; 256];
+            let n = server.read(&mut req).await.expect("read request");
+
+            let request = str::from_utf8(&req[..n]).expect("utf8 request");
+            assert!(request.starts_with("GET /bytes/16 HTTP/1.1\r\n"));
+            assert!(request.contains("Host: localhost\r\n"));
+            assert!(request.contains("Connection: close\r\n"));
+
+            server
+                .write_all( b"HTTP/1.1 200 OK\r\nContent-Length: 16\r\nConnection: close\r\n\r\n0123456789abcdef")
+                .await
+                .expect("write response");
+        });
+
+        assert_ok!(run_http1_exchange(&mut client, 16).await);
+        assert_ok!(server_task.await);
+    }
+
+    #[tokio::test]
+    async fn run_http1_exchange_accepts_bytes_read_with_headers() {
+        let (mut client, mut server) = tokio::io::duplex(4096);
+
+        let server_task = tokio::spawn(async move {
+            let mut req = [0; 256];
+            let _ = server.read(&mut req).await.expect("read request");
+
+            server
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nbody")
+                .await
+                .expect("write response");
+        });
+
+        assert_ok!(run_http1_exchange(&mut client, 4).await);
+        assert_ok!(server_task.await);
+    }
+
+    #[tokio::test]
+    async fn run_http1_exchange_rejects_missing_content_length() {
+        let (mut client, mut server) = tokio::io::duplex(4096);
+
+        let server_task = tokio::spawn(async move {
+            let mut req = [0; 256];
+            let _ = server.read(&mut req).await.expect("read request");
+
+            server
+                .write_all(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nbody")
+                .await
+                .expect("write response");
+        });
+
+        assert_err!(run_http1_exchange(&mut client, 4).await);
+        assert_ok!(server_task.await);
+    }
+
+    #[tokio::test]
+    async fn run_http1_exchange_reads_remaining_body_after_header_parse() {
+        let (mut client, mut server) = tokio::io::duplex(4096);
+
+        let server_task = tokio::spawn(async move {
+            let mut req = [0_u8; 256];
+            let _ = server.read(&mut req).await.expect("read request");
+
+            server
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\n12")
+                .await
+                .expect("write partial response");
+
+            server
+                .write_all(b"345678")
+                .await
+                .expect("write remaining body");
+        });
+
+        assert_ok!(run_http1_exchange(&mut client, 8).await);
+        assert_ok!(server_task.await);
     }
 }
