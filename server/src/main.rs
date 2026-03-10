@@ -9,12 +9,11 @@ mod server;
 mod tls;
 
 use crate::{server::run_server, tls::build_tls_config};
-use base64::prelude::*;
+use base64::{Engine, prelude::BASE64_STANDARD};
 use clap::Parser;
 use common::{cert::CaCertificate, prelude::*};
 use std::{env, net::SocketAddr};
 use tracing::{error, info};
-use tracing_subscriber::EnvFilter;
 
 /// TLS benchmark server.
 #[derive(Debug, Parser)]
@@ -35,11 +34,7 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_target(false)
-        .init();
-
+    init_tracing("warn", std::io::stderr);
     let args = Args::parse();
 
     info!(

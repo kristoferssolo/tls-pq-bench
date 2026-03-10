@@ -5,7 +5,7 @@ export RUST_LOG := env("RUST_LOG", "warn")
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-logs_dir := ".logs/"
+logs_dir := ".logs"
 results_dir := "results"
 benchmarks_dir := "benchmarks"
 runner := "./target/release/runner"
@@ -47,15 +47,15 @@ multi-server: build
     trap cleanup EXIT INT TERM
 
     echo "Starting benchmark servers:"
-    echo "  x25519 raw   -> 127.0.0.1:4433"
-    echo "  x25519 http1 -> 127.0.0.1:4434"
-    echo "  mlkem raw    -> 127.0.0.1:4435"
-    echo "  mlkem http1  -> 127.0.0.1:4436"
+    echo "    x25519 raw   -> 127.0.0.1:4433"
+    echo "    x25519 http1 -> 127.0.0.1:4434"
+    echo "    mlkem raw    -> 127.0.0.1:4435"
+    echo "    mlkem http1  -> 127.0.0.1:4436"
 
-    {{ server }} --mode x25519         --proto raw   --listen 127.0.0.1:4433 > {{ logs_dir }}/server-x25519-raw.log 2>&1           & pids+=($!)
-    {{ server }} --mode x25519         --proto http1 --listen 127.0.0.1:4434 > {{ logs_dir }}/server-x25519-http1.log 2>&1         & pids+=($!)
-    {{ server }} --mode x25519mlkem768 --proto raw   --listen 127.0.0.1:4435 > {{ logs_dir }}/server-x25519mlkem768-raw.log 2>&1   & pids+=($!)
-    {{ server }} --mode x25519mlkem768 --proto http1 --listen 127.0.0.1:4436 > {{ logs_dir }}/server-x25519mlkem768-http1.log 2>&1 & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode x25519         --proto raw   --listen 127.0.0.1:4433 > {{ logs_dir }}/server-x25519-raw.log 2>&1           & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode x25519         --proto http1 --listen 127.0.0.1:4434 > {{ logs_dir }}/server-x25519-http1.log 2>&1         & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768 --proto raw   --listen 127.0.0.1:4435 > {{ logs_dir }}/server-x25519mlkem768-raw.log 2>&1   & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768 --proto http1 --listen 127.0.0.1:4436 > {{ logs_dir }}/server-x25519mlkem768-http1.log 2>&1 & pids+=($!)
 
     wait
 

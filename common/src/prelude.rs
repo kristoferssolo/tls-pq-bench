@@ -4,4 +4,5 @@ pub use crate::{
         MAX_PAYLOAD_SIZE, generate_payload, read_payload, read_request, write_payload,
         write_request,
     },
+    telemetry::init_tracing,
 };

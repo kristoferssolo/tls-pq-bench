@@ -14,22 +14,18 @@ mod tls;
 
 use crate::{args::Args, bench::run_benchmark, config::Config, tls::build_tls_config};
 use clap::Parser;
+use common::prelude::init_tracing;
 use miette::{Context, IntoDiagnostic};
 use rustls::pki_types::ServerName;
 use std::{env, sync::Arc};
 use tokio_rustls::TlsConnector;
 use tracing::info;
-use tracing_subscriber::EnvFilter;
 use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
     let run_id = Uuid::new_v4();
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_target(false)
-        .init();
+    init_tracing("warn", std::io::stderr);
 
     info!(
         run_id = %run_id,
