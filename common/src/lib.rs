@@ -68,6 +68,36 @@ pub struct BenchRecord {
 }
 
 impl BenchRecord {
+    #[allow(clippy::too_many_arguments)]
+    #[inline]
+    #[must_use]
+    pub const fn new(
+        run_id: Uuid,
+        iteration: u32,
+        proto: ProtocolMode,
+        mode: KeyExchangeMode,
+        payload_bytes: u32,
+        concurrency: u32,
+        iters: u32,
+        warmup: u32,
+        tcp_ns: u128,
+        handshake_ns: u128,
+        ttlb_ns: u128,
+    ) -> Self {
+        Self {
+            run_id,
+            iteration,
+            proto,
+            mode,
+            payload_bytes,
+            concurrency,
+            iters,
+            warmup,
+            tcp_ns,
+            handshake_ns,
+            ttlb_ns,
+        }
+    }
     /// Serialize this record as a single NDJSON line (no trailing newline).
     ///
     /// # Errors
