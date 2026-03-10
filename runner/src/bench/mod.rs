@@ -20,6 +20,7 @@ use tokio::{
 };
 use tokio_rustls::TlsConnector;
 use tracing::info;
+use uuid::Uuid;
 
 /// Result of a single benchmark iteration.
 struct IterationResult {
@@ -29,6 +30,7 @@ struct IterationResult {
 }
 
 pub async fn run_benchmark(
+    run_id: Uuid,
     config: &BenchmarkConfig,
     tls_connector: &TlsConnector,
     server_name: &ServerName<'static>,
@@ -55,7 +57,7 @@ pub async fn run_benchmark(
     info!("warmup complete");
 
     let mut output = stdout();
-    run_and_write(config, tls_connector, server_name, &mut output).await?;
+    run_and_write(run_id, config, tls_connector, server_name, &mut output).await?;
     output
         .flush()
         .into_diagnostic()
@@ -66,6 +68,7 @@ pub async fn run_benchmark(
 }
 
 async fn run_and_write<W: Write + Send>(
+    run_id: Uuid,
     config: &BenchmarkConfig,
     tls_connector: &TlsConnector,
     server_name: &ServerName<'static>,
@@ -78,10 +81,8 @@ async fn run_and_write<W: Write + Send>(
         while issued < config.iters && in_flight.len() < config.concurrency as usize {
             in_flight.push(run_single_iteration(
                 issued,
-                config.payload,
-                config.proto,
-                config.mode,
-                config.server,
+                run_id,
+                config,
                 tls_connector.clone(),
                 server_name.clone(),
             ));
@@ -100,21 +101,30 @@ async fn run_and_write<W: Write + Send>(
 }
 
 async fn run_single_iteration(
-    i: u32,
-    payload_bytes: u32,
-    proto: ProtocolMode,
-    mode: KeyExchangeMode,
-    server: SocketAddr,
+    iteration: u32,
+    run_id: Uuid,
+    config: &BenchmarkConfig,
     tls_connector: TlsConnector,
     server_name: ServerName<'static>,
 ) -> miette::Result<BenchRecord> {
-    let result = run_iteration(server, proto, payload_bytes, &tls_connector, &server_name).await?;
+    let result = run_iteration(
+        config.server,
+        config.proto,
+        config.payload,
+        &tls_connector,
+        &server_name,
+    )
+    .await?;
 
     Ok(BenchRecord {
-        iteration: u64::from(i),
-        proto,
-        mode,
-        payload_bytes: u64::from(payload_bytes),
+        run_id,
+        iteration,
+        proto: config.proto,
+        mode: config.mode,
+        payload_bytes: config.payload,
+        concurrency: config.concurrency,
+        iters: config.iters,
+        warmup: config.warmup,
         tcp_ns: result.tcp,
         handshake_ns: result.handshake,
         ttlb_ns: result.ttlb,

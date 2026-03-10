@@ -9,6 +9,7 @@ pub use error::Error;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use strum::Display;
+use uuid::Uuid;
 
 /// TLS 1.3 key exchange mode used for benchmark runs
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, ValueEnum)]
@@ -42,14 +43,22 @@ pub enum ProtocolMode {
 /// A single benchmark measurement record, output as NDJSON
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BenchRecord {
+    /// Run ID
+    pub run_id: Uuid,
     /// Iteration number (0-indexed, excludes warmup)
-    pub iteration: u64,
+    pub iteration: u32,
     /// Protocol carrier mode
     pub proto: ProtocolMode,
     /// Key exchange mode used
     pub mode: KeyExchangeMode,
     /// Payload size in bytes
-    pub payload_bytes: u64,
+    pub payload_bytes: u32,
+    /// Number of concurrent connections
+    pub concurrency: u32,
+    /// Number of benchmark iterations (excluding warmup)
+    pub iters: u32,
+    /// Number of warmup iterations
+    pub warmup: u32,
     /// TCP connection latency in nanoseconds
     pub tcp_ns: u128,
     /// Handshake latency in nanoseconds
@@ -86,10 +95,14 @@ mod tests {
     #[test]
     fn bench_record_serializes_to_ndjson() {
         let record = BenchRecord {
+            run_id: Uuid::new_v4(),
             iteration: 0,
             proto: ProtocolMode::Raw,
             mode: KeyExchangeMode::X25519,
             payload_bytes: 1024,
+            concurrency: 1,
+            iters: 4,
+            warmup: 4,
             tcp_ns: 500_000,
             handshake_ns: 1_000_000,
             ttlb_ns: 2_000_000,
@@ -104,10 +117,14 @@ mod tests {
     #[test]
     fn bench_record_roundtrip() {
         let original = BenchRecord {
+            run_id: Uuid::new_v4(),
             iteration: 42,
             proto: ProtocolMode::Http1,
             mode: KeyExchangeMode::X25519Mlkem768,
             payload_bytes: 4096,
+            concurrency: 1,
+            iters: 4,
+            warmup: 4,
             tcp_ns: 1_000_000,
             handshake_ns: 5_000_000,
             ttlb_ns: 10_000_000,

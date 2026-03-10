@@ -34,7 +34,7 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
-    init_tracing("warn", std::io::stderr);
+    init_tracing(std::io::stderr);
     let args = Args::parse();
 
     info!(

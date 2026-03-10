@@ -25,7 +25,7 @@ use uuid::Uuid;
 #[tokio::main]
 async fn main() -> miette::Result<()> {
     let run_id = Uuid::new_v4();
-    init_tracing("warn", std::io::stderr);
+    init_tracing(std::io::stderr);
 
     info!(
         run_id = %run_id,
@@ -64,7 +64,7 @@ async fn main() -> miette::Result<()> {
         let tls_config = build_tls_config(benchmark.mode)?;
         let tls_connector = TlsConnector::from(Arc::new(tls_config));
 
-        run_benchmark(benchmark, &tls_connector, &server_name).await?;
+        run_benchmark(run_id, benchmark, &tls_connector, &server_name).await?;
     }
 
     Ok(())

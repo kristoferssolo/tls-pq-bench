@@ -80,6 +80,14 @@ sanity-matrix: build
     echo "Writing sanity matrix results to $out"
     {{ runner }} --config {{ benchmarks_dir }}/sanity.toml > "$out"
 
+[group("bench")]
+baseline-matrix: build
+    #!/usr/bin/env bash
+    just _setup
+    out="{{ results_dir }}/baseline-$(date +%F-%H%M%S).ndjson"
+    echo "Writing baseline matrix results to $out"
+    {{ runner }} --config {{ benchmarks_dir }}/baseline.toml > "$out"
+
 # Smoke benchmarks - requires multi-server to be running
 [group("bench")]
 smoke-raw-x25519:
