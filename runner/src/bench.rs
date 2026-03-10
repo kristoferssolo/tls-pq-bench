@@ -142,9 +142,9 @@ async fn run_iteration(
     let handshake_ns = hs_start.elapsed().as_nanos();
 
     let ttlb_start = Instant::now();
+    run_exchange(&mut tls_stream, proto, payload_bytes).await?;
 
     let ttlb_ns = tcp_ns + handshake_ns + ttlb_start.elapsed().as_nanos();
-    run_exchange(&mut tls_stream, proto, payload_bytes).await?;
 
     Ok(IterationResult {
         tcp: tcp_ns,
