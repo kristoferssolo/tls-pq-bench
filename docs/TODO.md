@@ -36,17 +36,17 @@
 
 ### Server (`proto=http1`)
 
-- [ ] Implement HTTP routes:
-  - [ ] `GET /bytes/{n}`
-- [ ] Response body = `n` bytes deterministic payload
-- [ ] Ensure keep-alive behavior is controlled (prefer 1 request per connection)
+- [x] Implement HTTP routes:
+  - [x] `GET /bytes/{n}`
+- [x] Response body = `n` bytes deterministic payload
+- [x] Ensure keep-alive behavior is controlled (prefer 1 request per connection)
 
 ### Client (`proto=http1`)
 
-- [ ] `GET /bytes/n` and read full body
-- [ ] TTLB measured to last byte of body
-- [ ] Keep behavior comparable with raw mode:
-  - [ ] 1 request per new TLS connection (for now)
+- [x] `GET /bytes/{n}` and read full body
+- [x] TTLB measured to last byte of body
+- [x] Keep behavior comparable with raw mode:
+  - [x] 1 request per new TLS connection (for now)
 
 ## Milestone 6 -- Compare `raw` vs `http1` [OPTIONAL]
 

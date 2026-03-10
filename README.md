@@ -8,7 +8,12 @@ Reproducible benchmarking harness for comparing TLS 1.3 key exchange configurati
   - Classical: `x25519`
   - Hybrid PQ: `x25519mlkem768` (via `rustls` + `aws_lc_rs`)
 
+- **Protocol Modes**
+  - `raw` for low-overhead framed payload benchmarking
+  - `http1` for HTTP/1.1 request and response benchmarking
+
 - **Metrics**
+  - TCP connection latency (nanoseconds)
   - Handshake latency (nanoseconds)
   - TTLB - Time-to-Last-Byte (nanoseconds)
 
@@ -28,7 +33,7 @@ Reproducible benchmarking harness for comparing TLS 1.3 key exchange configurati
 - **Matrix Benchmarks**
   - TOML configuration file support
   - Run multiple benchmark configurations sequentially
-  - Each configuration: mode, payload, iters, warmup, concurrency
+  - Each configuration: proto, mode, payload, iters, warmup, concurrency
 
 ## Quick Start
 
@@ -87,8 +92,8 @@ Run:
 Results are emitted as NDJSON to stdout or a file:
 
 ```ndjson
-{"iteration":0,"mode":"x25519","payload_bytes":1024,"handshake_ns":500000,"ttlb_ns":650000}
-{"iteration":1,"mode":"x25519","payload_bytes":1024,"handshake_ns":490000,"ttlb_ns":620000}
+{"iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"tcp_ns":120000,"handshake_ns":500000,"ttlb_ns":650000}
+{"iteration":1,"proto":"http1","mode":"x25519mlkem768","payload_bytes":1024,"tcp_ns":130000,"handshake_ns":560000,"ttlb_ns":760000}
 ```
 
 ### Logging
