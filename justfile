@@ -61,7 +61,7 @@ multi-server: build
 
 # Run a parameterized benchmark against a live server
 [group("run")]
-runner server_addr="127.0.0.1:4433" proto="raw" mode="x25519" payload="1024" iters="200" warmup="20" concurrency="1":
+runner server_addr="127.0.0.1:4433" proto="raw" mode="x25519" payload="1024" iters="200" warmup="20" concurrency="1": build
     {{ runner }} \
         --server {{ server_addr }} \
         --proto {{ proto }} \

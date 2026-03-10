@@ -12,14 +12,14 @@ use rustls::pki_types::ServerName;
 use std::{
     io::{Write, stdout},
     net::SocketAddr,
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::TcpStream,
 };
 use tokio_rustls::TlsConnector;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 /// Result of a single benchmark iteration.
@@ -44,13 +44,22 @@ pub async fn run_benchmark(
         "running benchmark iterations"
     );
 
-    for _ in 0..config.warmup {
+    for i in 0..config.warmup {
+        debug!(
+            phase = "warmup",
+            iteration = i,
+            server = %config.server,
+            proto = %config.proto,
+            payload_bytes = %config.payload,
+            "iteration started"
+        );
         run_iteration(
             server,
             config.proto,
             config.payload,
             tls_connector,
             server_name,
+            i,
         )
         .await?;
     }
@@ -76,6 +85,7 @@ async fn run_and_write<W: Write + Send>(
 ) -> miette::Result<()> {
     let mut in_flight = FuturesUnordered::new();
     let mut issued = 0;
+    let mut completed = 0;
 
     loop {
         while issued < config.iters && in_flight.len() < config.concurrency as usize {
@@ -90,9 +100,23 @@ async fn run_and_write<W: Write + Send>(
         }
 
         match in_flight.next().await {
-            Some(record) => writeln!(output, "{}", record?)
-                .into_diagnostic()
-                .context("failed to write record")?,
+            Some(record) => {
+                let record = record?;
+                completed += 1;
+
+                if completed % 10 == 0 || completed == config.iters {
+                    debug!(
+                        completed,
+                        issued,
+                        in_flight = in_flight.len(),
+                        "benchmark progress"
+                    );
+                }
+
+                writeln!(output, "{record}")
+                    .into_diagnostic()
+                    .context("failed to write record")?;
+            }
             None => break,
         }
     }
@@ -107,14 +131,27 @@ async fn run_single_iteration(
     tls_connector: TlsConnector,
     server_name: ServerName<'static>,
 ) -> miette::Result<BenchRecord> {
-    let result = run_iteration(
-        config.server,
-        config.proto,
-        config.payload,
-        &tls_connector,
-        &server_name,
+    debug!(
+        phase = "measured",
+        iteration,
+        server = %config.server,
+        proto = %config.proto,
+        payload_bytes = %config.payload,
+        "iteration started"
+    );
+    let result = tokio::time::timeout(
+        Duration::from_secs(10),
+        run_iteration(
+            config.server,
+            config.proto,
+            config.payload,
+            &tls_connector,
+            &server_name,
+            iteration,
+        ),
     )
-    .await?;
+    .await
+    .map_err(|_| common::Error::protocol(format!("iteration {iteration} time out")))??;
 
     Ok(BenchRecord {
         run_id,
@@ -138,8 +175,10 @@ async fn run_iteration(
     payload_bytes: u32,
     tls_connector: &TlsConnector,
     server_name: &ServerName<'static>,
+    iteration: u32,
 ) -> miette::Result<IterationResult> {
     let tcp_start = Instant::now();
+    debug!(iteration, "tcp connection started");
 
     let stream = TcpStream::connect(server)
         .await
@@ -147,8 +186,11 @@ async fn run_iteration(
         .context("TCP connection failed")?;
 
     let tcp_ns = tcp_start.elapsed().as_nanos();
+    debug!(iteration, tcp_ns, "tcp connection complete");
 
     let hs_start = Instant::now();
+    debug!(iteration, "tls handshake started");
+
     let mut tls_stream = tls_connector
         .connect(server_name.clone(), stream)
         .await
@@ -156,11 +198,14 @@ async fn run_iteration(
         .context("TLS handshake failed")?;
 
     let handshake_ns = hs_start.elapsed().as_nanos();
+    debug!(iteration, handshake_ns, "tls handshake complete");
 
     let ttlb_start = Instant::now();
+    debug!(iteration, "protocol exchange started");
     run_exchange(&mut tls_stream, proto, payload_bytes).await?;
 
     let ttlb_ns = tcp_ns + handshake_ns + ttlb_start.elapsed().as_nanos();
+    debug!(iteration, ttlb_ns, "protocol exchange complete");
 
     Ok(IterationResult {
         tcp: tcp_ns,
