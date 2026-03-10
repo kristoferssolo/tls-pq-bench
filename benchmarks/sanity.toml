@@ -1,0 +1,35 @@
+[[benchmarks]]
+server = "127.0.0.1:4433"
+proto = "raw"
+mode = "x25519"
+payload = 1024
+iters = 5
+warmup = 1
+concurrency = 1
+
+[[benchmarks]]
+server = "127.0.0.1:4434"
+proto = "http1"
+mode = "x25519"
+payload = 1024
+iters = 5
+warmup = 1
+concurrency = 1
+
+[[benchmarks]]
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 1024
+iters = 5
+warmup = 1
+concurrency = 1
+
+[[benchmarks]]
+server = "127.0.0.1:4436"
+proto = "http1"
+mode = "x25519mlkem768"
+payload = 1024
+iters = 5
+warmup = 1
+concurrency = 1
