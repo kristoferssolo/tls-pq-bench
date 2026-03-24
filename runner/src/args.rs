@@ -34,7 +34,7 @@ pub struct Args {
     #[arg(long, default_value = "1")]
     pub concurrency: u32,
 
-    /// Output file for NDJSON records (stdout if not specified)
+    /// Output file for JSONL records (stdout if not specified)
     #[arg(long)]
     pub out: Option<PathBuf>,
 

@@ -76,7 +76,7 @@ runner server_addr="127.0.0.1:4433" proto="raw" mode="x25519" payload="1024" ite
 sanity-matrix: build
     #!/usr/bin/env bash
     just _setup
-    out="{{ results_dir }}/sanity-$(date +%F-%H%M%S).ndjson"
+    out="{{ results_dir }}/sanity-$(date +%F-%H%M%S).jsonl"
     echo "Writing sanity matrix results to $out"
     {{ runner }} --config {{ benchmarks_dir }}/sanity.toml > "$out"
 
@@ -84,26 +84,26 @@ sanity-matrix: build
 baseline-matrix: build
     #!/usr/bin/env bash
     just _setup
-    out="{{ results_dir }}/baseline-$(date +%F-%H%M%S).ndjson"
+    out="{{ results_dir }}/baseline-$(date +%F-%H%M%S).jsonl"
     echo "Writing baseline matrix results to $out"
     {{ runner }} --config {{ benchmarks_dir }}/baseline.toml > "$out"
 
 # Smoke benchmarks - requires multi-server to be running
 [group("bench")]
 smoke-raw-x25519:
-    just _bench 127.0.0.1:4433 raw x25519 smoke-raw-x25519.ndjson
+    just _bench 127.0.0.1:4433 raw x25519 smoke-raw-x25519.jsonl
 
 [group("bench")]
 smoke-http1-x25519:
-    just _bench 127.0.0.1:4434 http1 x25519 smoke-http1-x25519.ndjson
+    just _bench 127.0.0.1:4434 http1 x25519 smoke-http1-x25519.jsonl
 
 [group("bench")]
 smoke-raw-mlkem:
-    just _bench 127.0.0.1:4435 raw x25519mlkem768 smoke-raw-mlkem.ndjson
+    just _bench 127.0.0.1:4435 raw x25519mlkem768 smoke-raw-mlkem.jsonl
 
 [group("bench")]
 smoke-http1-mlkem:
-    just _bench 127.0.0.1:4436 http1 x25519mlkem768 smoke-http1-mlkem.ndjson
+    just _bench 127.0.0.1:4436 http1 x25519mlkem768 smoke-http1-mlkem.jsonl
 
 # Run all smoke benchmarks
 [group("bench")]

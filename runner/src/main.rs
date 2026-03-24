@@ -4,7 +4,7 @@
 //! - Handshake latency
 //! - Time-to-last-byte (TTLB)
 //!
-//! Outputs NDJSON records to stdout or a file.
+//! Outputs JSONL records to stdout or a file.
 
 mod args;
 mod bench;

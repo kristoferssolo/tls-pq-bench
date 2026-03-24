@@ -40,7 +40,7 @@ pub enum ProtocolMode {
     Http1,
 }
 
-/// A single benchmark measurement record, output as NDJSON
+/// A single benchmark measurement record, output as JSONL
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BenchRecord {
     /// Run ID
@@ -98,18 +98,18 @@ impl BenchRecord {
             ttlb_ns,
         }
     }
-    /// Serialize this record as a single NDJSON line (no trailing newline).
+    /// Serialize this record as a single JSONL line (no trailing newline).
     ///
     /// # Errors
     /// Returns an error if serialization fails
-    pub fn to_ndjson(&self) -> Result<String, serde_json::Error> {
+    pub fn to_jsonl(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
 }
 
 impl fmt::Display for BenchRecord {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.to_ndjson() {
+        match self.to_jsonl() {
             Ok(json) => write!(f, "{json}"),
             Err(e) => write!(f, r#"{{"error": "{e}"}}"#),
         }
@@ -123,7 +123,7 @@ mod tests {
     use serde_json::Value;
 
     #[test]
-    fn bench_record_serializes_to_ndjson() {
+    fn bench_record_serializes_to_jsonl() {
         let record = BenchRecord {
             run_id: Uuid::new_v4(),
             iteration: 0,
@@ -137,7 +137,7 @@ mod tests {
             handshake_ns: 1_000_000,
             ttlb_ns: 2_000_000,
         };
-        let json = assert_ok!(record.to_ndjson());
+        let json = assert_ok!(record.to_jsonl());
         assert!(json.contains(r#""iteration":0"#));
         assert!(json.contains(r#""proto":"raw""#));
         assert!(json.contains(r#""mode":"x25519""#));
@@ -159,7 +159,7 @@ mod tests {
             handshake_ns: 5_000_000,
             ttlb_ns: 10_000_000,
         };
-        let json = assert_ok!(original.to_ndjson());
+        let json = assert_ok!(original.to_jsonl());
         let deserialized = assert_ok!(serde_json::from_str::<BenchRecord>(&json));
 
         assert_eq!(original.iteration, deserialized.iteration);

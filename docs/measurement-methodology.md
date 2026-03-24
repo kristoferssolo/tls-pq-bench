@@ -45,7 +45,7 @@ Operationally:
 
 ## Output format
 
-Write newline-delimited JSON (NDJSON) for easy aggregation:
+Write newline-delimited JSON (JSONL) for easy aggregation:
 
 Example record:
 

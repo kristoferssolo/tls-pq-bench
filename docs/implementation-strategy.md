@@ -7,7 +7,7 @@ Implement `raw` protocol end-to-end with:
 - rustls TLS server/client
 - KX modes: X25519 vs X25519MLKEM768
 - handshake latency + TTLB
-- concurrency and NDJSON output
+- concurrency and JSONL output
 
 ## Phase 2 (optional)
 

@@ -89,9 +89,9 @@ Run:
 
 ### Output
 
-Results are emitted as NDJSON to stdout or a file:
+Results are emitted as JSONL to stdout or a file:
 
-```ndjson
+```jsonl
 {"iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"tcp_ns":120000,"handshake_ns":500000,"ttlb_ns":650000}
 {"iteration":1,"proto":"http1","mode":"x25519mlkem768","payload_bytes":1024,"tcp_ns":130000,"handshake_ns":560000,"ttlb_ns":760000}
 ```

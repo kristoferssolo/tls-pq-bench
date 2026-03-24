@@ -27,7 +27,7 @@ Raw example:
     --concurrency 10 \
     --iters 500 \
     --warmup 50 \
-    --out results.ndjson
+    --out results.jsonl
 ```
 
 HTTP/1.1 example:
@@ -42,7 +42,7 @@ HTTP/1.1 example:
     --concurrency 1 \
     --iters 200 \
     --warmup 20 \
-    --out results-http1.ndjson
+    --out results-http1.jsonl
 ```
 
 ### Matrix Benchmarks
@@ -75,7 +75,7 @@ Run matrix:
 ./target/release/runner --config matrix.toml
 ```
 
-Each NDJSON record now includes both `proto` and `mode`, so `raw` and `http1`
+Each JSONL record now includes both `proto` and `mode`, so `raw` and `http1`
 runs can be aggregated separately during analysis.
 
 ## 4) Collect perf stats (optional)
@@ -88,4 +88,4 @@ perf stat -e cycles,instructions,cache-misses ./target/release/runner ...
 
 ## 5) Summarize
 
-Use a script to compute p50/p95/p99 from NDJSON.
+Use a script to compute p50/p95/p99 from JSONL.

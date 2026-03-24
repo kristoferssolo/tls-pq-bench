@@ -28,10 +28,10 @@
  | 1 KB | http1 | X25519MLKEM768 | 1 |  |  |  |
  ...
 
-## NDJSON schema reminder
+## JSONL schema reminder
 
 Example record:
 
-```ndjson
+```jsonl
 {"iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"tcp_ns":120000,"handshake_ns":500000,"ttlb_ns":650000}
 ```

@@ -19,7 +19,7 @@
 - [x] T0 before connect
 - [x] T_hs_done after handshake completion
 - [x] T_last after last byte read
-- [x] Output NDJSON
+- [x] Output JSONL
 
 ## Milestone 3 -- KX selection (X25519 vs X25519MLKEM768) \[MUST\]
 
