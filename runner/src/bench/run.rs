@@ -5,16 +5,17 @@ use crate::{
 use futures::{StreamExt, stream::FuturesUnordered};
 use miette::{Context, IntoDiagnostic};
 use rustls::pki_types::ServerName;
-use std::io::{Write, stdout};
+use std::io::Write;
 use tokio_rustls::TlsConnector;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-pub async fn run_benchmark(
+pub async fn run_benchmark<W: Write + Send>(
     run_id: Uuid,
     config: &BenchmarkConfig,
     tls_connector: &TlsConnector,
     server_name: &ServerName<'static>,
+    output: &mut W,
 ) -> miette::Result<()> {
     let server = config.server;
 
@@ -46,8 +47,7 @@ pub async fn run_benchmark(
     }
     info!("warmup complete");
 
-    let mut output = stdout();
-    run_and_write(run_id, config, tls_connector, server_name, &mut output).await?;
+    run_and_write(run_id, config, tls_connector, server_name, output).await?;
     output
         .flush()
         .into_diagnostic()

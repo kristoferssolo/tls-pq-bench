@@ -17,7 +17,13 @@ use clap::Parser;
 use common::prelude::init_tracing;
 use miette::{Context, IntoDiagnostic};
 use rustls::pki_types::ServerName;
-use std::{env, sync::Arc};
+use std::{
+    env,
+    fs::File,
+    io::{self, BufWriter, Write},
+    path::Path,
+    sync::Arc,
+};
 use tokio_rustls::TlsConnector;
 use tracing::info;
 use uuid::Uuid;
@@ -37,6 +43,7 @@ async fn main() -> miette::Result<()> {
     );
 
     let args = Args::parse();
+    let mut output = create_output(args.out.as_deref())?;
 
     let config: Config = if let Some(config_path) = &args.config {
         info!(config_file = %config_path.display(), "loading config from file");
@@ -64,8 +71,47 @@ async fn main() -> miette::Result<()> {
         let tls_config = build_tls_config(benchmark.mode)?;
         let tls_connector = TlsConnector::from(Arc::new(tls_config));
 
-        run_benchmark(run_id, benchmark, &tls_connector, &server_name).await?;
+        run_benchmark(run_id, benchmark, &tls_connector, &server_name, &mut output).await?;
     }
 
     Ok(())
+}
+
+fn create_output(path: Option<&Path>) -> miette::Result<Box<dyn Write + Send>> {
+    match path {
+        Some(path) => {
+            let file = File::create(path)
+                .into_diagnostic()
+                .with_context(|| format!("failed to create output file {}", path.display()))?;
+            Ok(Box::new(BufWriter::new(file)))
+        }
+        None => Ok(Box::new(BufWriter::new(io::stdout()))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claims::assert_ok;
+    use std::{
+        env::temp_dir,
+        fs::{read_to_string, remove_file},
+    };
+
+    #[test]
+    fn create_output_writes_to_file_when_path_is_provided() {
+        let path = temp_dir().join(format!(
+            "tls-pq-bench-runner-out-{}.jsonl",
+            std::process::id()
+        ));
+
+        let mut output = assert_ok!(create_output(Some(path.as_path())));
+        writeln!(output, "test-line").expect("writing to a file");
+        drop(output);
+
+        let content = read_to_string(&path).expect("reading from a file");
+        assert_eq!(content, "test-line\n");
+
+        let _ = remove_file(path);
+    }
 }
