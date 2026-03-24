@@ -1,8 +1,10 @@
 use bytes::Bytes;
 use common::prelude::*;
-use http_body_util::Full;
+use futures::stream;
+use http_body_util::{BodyExt, Full, StreamBody, combinators::BoxBody};
 use hyper::{
     Method, Request, Response, StatusCode,
+    body::Frame,
     header::{ALLOW, CONNECTION, CONTENT_LENGTH, CONTENT_TYPE, HeaderValue},
     server::conn::http1::Builder,
     service::service_fn,
@@ -14,7 +16,7 @@ use tokio::net::TcpStream;
 use tokio_rustls::LazyConfigAcceptor;
 use tracing::{info, warn};
 
-type RespBody = Full<Bytes>;
+type RespBody = BoxBody<Bytes, Infallible>;
 
 pub async fn handle_http1_connection(
     stream: TcpStream,
@@ -77,8 +79,7 @@ fn handle_request<B>(req: &Request<B>) -> Response<RespBody> {
         }
     };
 
-    let payload = generate_payload(n);
-    let mut response = Response::new(Full::new(Bytes::from(payload)));
+    let mut response = Response::new(steaming_payload_body(n));
     *response.status_mut() = StatusCode::OK;
 
     let headers = response.headers_mut();
@@ -96,6 +97,29 @@ fn handle_request<B>(req: &Request<B>) -> Response<RespBody> {
         }
         Err(_) => text_response(StatusCode::INTERNAL_SERVER_ERROR, "internal server error"),
     }
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn steaming_payload_body(size: u64) -> BoxBody<Bytes, Infallible> {
+    const CHUNK_SIZE: usize = 64 * 1024;
+
+    let stream = stream::unfold((size as usize, 0), |(remaining, offset)| async move {
+        if remaining == 0 {
+            return None;
+        }
+        let chunk_len = remaining.min(CHUNK_SIZE);
+        let chunk = (0..chunk_len)
+            .map(|i| ((offset + i) & 0xFF) as u8)
+            .collect::<Vec<_>>();
+        let frame = Frame::data(Bytes::from(chunk));
+
+        Some((
+            Ok::<_, Infallible>(frame),
+            (remaining - chunk_len, offset + chunk_len),
+        ))
+    });
+
+    StreamBody::new(stream).boxed()
 }
 
 fn parse_bytes_path(path: &str) -> Result<u64, StatusCode> {
@@ -117,7 +141,7 @@ fn parse_bytes_path(path: &str) -> Result<u64, StatusCode> {
 }
 
 fn text_response(status: StatusCode, msg: &'static str) -> Response<RespBody> {
-    let mut response = Response::new(Full::new(Bytes::from_static(msg.as_bytes())));
+    let mut response = Response::new(Full::new(Bytes::from_static(msg.as_bytes())).boxed());
     *response.status_mut() = status;
     response.headers_mut().insert(
         CONTENT_TYPE,
@@ -303,5 +327,24 @@ mod tests {
 
         let connection = assert_some!(resp.headers().get("connection"));
         assert_eq!(connection, "close");
+    }
+
+    #[tokio::test]
+    async fn handle_request_get_bytes_streams_across_chunk_boundry() {
+        let req = make_get_request("/bytes/70000");
+
+        let resp = handle_request(&req);
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let content_length = assert_some!(resp.headers().get("content-length"));
+        assert_ok!(content_length.to_str(), "70000");
+
+        let body = assert_ok!(resp.into_body().collect().await).to_bytes();
+        assert_eq!(body.len(), 70_000);
+        assert_eq!(body[0], 0x00);
+        assert_eq!(body[255], 0xFF);
+        assert_eq!(body[256], 0x00);
+        assert_eq!(body[65_535], 0xFF);
+        assert_eq!(body[65_536], 0x00);
     }
 }

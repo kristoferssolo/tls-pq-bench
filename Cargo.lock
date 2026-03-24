@@ -1111,6 +1111,7 @@ dependencies = [
  "claims",
  "clap",
  "common",
+ "futures",
  "http-body-util",
  "hyper",
  "hyper-util",
