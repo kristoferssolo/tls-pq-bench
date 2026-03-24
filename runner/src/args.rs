@@ -41,4 +41,8 @@ pub struct Args {
     /// Config file for matrix benchmarks (TOML)
     #[arg(long, short)]
     pub config: Option<PathBuf>,
+
+    /// Config file for matrix benchmarks (TOML)
+    #[arg(long)]
+    pub ca_cert: Option<PathBuf>,
 }

@@ -7,7 +7,7 @@ pub mod telemetry;
 use clap::ValueEnum;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{fmt, path::PathBuf};
 use strum::Display;
 use uuid::Uuid;
 
@@ -38,6 +38,16 @@ pub enum ProtocolMode {
     Raw,
     /// HTTP/1.1 mode for realism-oriented comparisons.
     Http1,
+}
+
+/// TLS certificate verification mode.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase", tag = "kind")]
+pub enum VerificationMode {
+    /// Skip certificate verification (danger: MITM-vulnerable).
+    Insecure,
+    /// Verify against a custom CA certificate
+    CaCert { path: PathBuf },
 }
 
 /// A single benchmark measurement record, output as JSONL
@@ -113,6 +123,12 @@ impl fmt::Display for BenchRecord {
             Ok(json) => write!(f, "{json}"),
             Err(e) => write!(f, r#"{{"error": "{e}"}}"#),
         }
+    }
+}
+
+impl From<Option<PathBuf>> for VerificationMode {
+    fn from(ca_cert_path: Option<PathBuf>) -> Self {
+        ca_cert_path.map_or(Self::Insecure, |path| Self::CaCert { path })
     }
 }
 

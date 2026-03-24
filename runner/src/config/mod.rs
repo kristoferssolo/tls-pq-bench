@@ -5,7 +5,7 @@ use crate::{
     config::utils::validate_config,
     error::{self, ConfigError},
 };
-use common::prelude::*;
+use common::{VerificationMode, prelude::*};
 use miette::{NamedSource, SourceSpan};
 use serde::Deserialize;
 use std::{fs::read_to_string, net::SocketAddr, path::Path};
@@ -14,6 +14,7 @@ use std::{fs::read_to_string, net::SocketAddr, path::Path};
 pub struct BenchmarkConfig {
     pub proto: ProtocolMode,
     pub mode: KeyExchangeMode,
+    pub verification: VerificationMode,
     pub payload: u32,
     pub iters: u32,
     pub warmup: u32,
@@ -71,6 +72,7 @@ impl TryFrom<Args> for Config {
             benchmarks: vec![BenchmarkConfig {
                 proto: args.proto,
                 mode: args.mode,
+                verification: args.ca_cert.into(),
                 payload: args.payload_bytes,
                 iters: args.iters,
                 warmup: args.warmup,
@@ -87,11 +89,13 @@ impl TryFrom<Args> for Config {
 mod tests {
     use super::*;
     use claims::{assert_err, assert_ok};
+    use std::path::PathBuf;
 
     const VALID_CONFIG: &str = r#"
 [[benchmarks]]
 proto = "raw"
 mode = "x25519"
+verification.kind = "insecure"
 payload = 1024
 iters = 100
 warmup = 10
@@ -101,6 +105,7 @@ server = "127.0.0.1:4433"
 [[benchmarks]]
 proto = "http1"
 mode = "x25519mlkem768"
+verification = { kind = "cacert", path = "certs/ca.der" }
 payload = 4096
 iters = 50
 warmup = 5
@@ -118,6 +123,7 @@ server = "127.0.0.1:4433"
 [[benchmarks]]
 proto = "raw"
 mode = "x25519"
+verification.kind = "insecure"
 payload = 1024
 iters = 100
 warmup = 10
@@ -139,8 +145,120 @@ server = "127.0.0.1:4433"
 
         assert_eq!(bench_0.mode, KeyExchangeMode::X25519);
         assert_eq!(bench_0.proto, ProtocolMode::Raw);
+        assert_eq!(bench_0.verification, VerificationMode::Insecure);
         assert_eq!(bench_1.mode, KeyExchangeMode::X25519Mlkem768);
         assert_eq!(bench_1.proto, ProtocolMode::Http1);
+        assert_eq!(
+            bench_1.verification,
+            VerificationMode::CaCert {
+                path: PathBuf::from("certs/ca.der")
+            }
+        );
+    }
+
+    #[test]
+    fn verification_insecure_deserializes_from_toml() {
+        let toml = r#"
+[[benchmarks]]
+proto = "raw"
+mode = "x25519"
+verification.kind = "insecure"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+"#;
+
+        let config = get_config_from_str(toml);
+        assert_eq!(
+            config.benchmarks[0].verification,
+            VerificationMode::Insecure
+        );
+    }
+
+    #[test]
+    fn verification_ca_cert_deserializes_from_toml() {
+        let toml = r#"
+[[benchmarks]]
+proto = "raw"
+mode = "x25519"
+verification = { kind = "cacert", path = "certs/ca.der" }
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+"#;
+
+        let config = get_config_from_str(toml);
+        assert_eq!(
+            config.benchmarks[0].verification,
+            VerificationMode::CaCert {
+                path: PathBuf::from("certs/ca.der"),
+            }
+        );
+    }
+
+    #[test]
+    fn verification_string_form_is_rejected() {
+        let toml = r#"
+[[benchmarks]]
+proto = "raw"
+mode = "x25519"
+verification = "insecure"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+server = "127.0.0.1:4433"
+"#;
+
+        assert_err!(toml::from_str::<Config>(toml));
+    }
+
+    #[test]
+    fn cli_args_without_ca_cert_default_to_insecure_verification() {
+        let config = assert_ok!(Config::try_from(Args {
+            proto: ProtocolMode::Raw,
+            mode: KeyExchangeMode::X25519,
+            server: Some("127.0.0.1:4433".parse().expect("socket addr")),
+            payload_bytes: 1024,
+            iters: 100,
+            warmup: 10,
+            concurrency: 1,
+            out: None,
+            config: None,
+            ca_cert: None,
+        }));
+
+        assert_eq!(
+            config.benchmarks[0].verification,
+            VerificationMode::Insecure
+        );
+    }
+
+    #[test]
+    fn cli_args_with_ca_cert_map_to_ca_cert_verification() {
+        let config = assert_ok!(Config::try_from(Args {
+            proto: ProtocolMode::Raw,
+            mode: KeyExchangeMode::X25519,
+            server: Some("127.0.0.1:4433".parse().expect("socket addr")),
+            payload_bytes: 1024,
+            iters: 100,
+            warmup: 10,
+            concurrency: 1,
+            out: None,
+            config: None,
+            ca_cert: Some(PathBuf::from("certs/ca.der")),
+        }));
+
+        assert_eq!(
+            config.benchmarks[0].verification,
+            VerificationMode::CaCert {
+                path: PathBuf::from("certs/ca.der"),
+            }
+        );
     }
 
     #[test]
@@ -149,6 +267,7 @@ server = "127.0.0.1:4433"
 [[benchmarks]]
 proto = "invalid_proto"
 mode = "x25519"
+verification.kind = "insecure"
 payload = 1024
 iters = 100
 warmup = 10
@@ -164,6 +283,7 @@ server = "127.0.0.1:4433"
 [[benchmarks]]
 proto = "raw"
 mode = "invalid_mode"
+verification.kind = "insecure"
 payload = 1024
 iters = 100
 warmup = 10
@@ -179,6 +299,7 @@ server = "127.0.0.1:4433"
 [[benchmarks]]
 proto = "raw"
 mode = "x25519"
+verification.kind = "insecure"
 payload = 0
 iters = 100
 warmup = 10
@@ -195,6 +316,7 @@ server = "127.0.0.1:4433"
 [[benchmarks]]
 proto = "raw"
 mode = "x25519"
+verification.kind = "insecure"
 payload = 1024
 iters = 0
 warmup = 10
@@ -211,6 +333,7 @@ server = "127.0.0.1:4433"
 [[benchmarks]]
 proto = "raw"
 mode = "x25519"
+verification.kind = "insecure"
 payload = 1024
 iters = 100
 warmup = 10

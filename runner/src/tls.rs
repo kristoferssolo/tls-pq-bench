@@ -1,7 +1,7 @@
-use common::prelude::*;
+use common::{VerificationMode, prelude::*};
 use miette::{Context, IntoDiagnostic};
 use rustls::{
-    ClientConfig, DigitallySignedStruct, SignatureScheme,
+    ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme,
     client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
     compress::CompressionCache,
     crypto::aws_lc_rs::{
@@ -11,7 +11,7 @@ use rustls::{
     pki_types::{CertificateDer, ServerName, UnixTime},
     version::TLS13,
 };
-use std::sync::Arc;
+use std::{fs, path::Path, sync::Arc};
 
 /// Certificate verifier that accepts any certificate.
 /// Used for benchmarking where we don't need to verify the server's identity.
@@ -65,22 +65,51 @@ impl ServerCertVerifier for NoVerifier {
 }
 
 /// Build TLS client config for the given key exchange mode.
-pub fn build_tls_config(mode: KeyExchangeMode) -> miette::Result<ClientConfig> {
+pub fn build_tls_config(
+    mode: KeyExchangeMode,
+    verification: &VerificationMode,
+) -> miette::Result<ClientConfig> {
     let mut provider = aws_lc_rs::default_provider();
     provider.kx_groups = match mode {
         KeyExchangeMode::X25519 => vec![X25519],
         KeyExchangeMode::X25519Mlkem768 => vec![X25519MLKEM768],
     };
 
-    let mut config = ClientConfig::builder_with_provider(Arc::new(provider))
+    let builder = ClientConfig::builder_with_provider(Arc::new(provider))
         .with_protocol_versions(&[&TLS13])
         .into_diagnostic()
-        .context("failed to set TLS versions")?
-        .dangerous()
-        .with_custom_certificate_verifier(Arc::new(NoVerifier))
-        .with_no_client_auth();
+        .context("failed to set TLS versions")?;
+
+    let mut config = match verification {
+        VerificationMode::Insecure => builder
+            .dangerous()
+            .with_custom_certificate_verifier(Arc::new(NoVerifier))
+            .with_no_client_auth(),
+        VerificationMode::CaCert { path } => {
+            let roots = load_roots_store(path)?;
+            builder.with_root_certificates(roots).with_no_client_auth()
+        }
+    };
 
     config.cert_compression_cache = Arc::new(CompressionCache::Disabled);
 
     Ok(config)
+}
+
+fn load_roots_store<P: AsRef<Path>>(ca_cert_path: &P) -> miette::Result<RootCertStore> {
+    let cert_bytes = fs::read(ca_cert_path).into_diagnostic().with_context(|| {
+        format!(
+            "failed to read CA certificate {}",
+            ca_cert_path.as_ref().display()
+        )
+    })?;
+
+    let mut roots = RootCertStore::empty();
+
+    roots
+        .add(CertificateDer::from(cert_bytes))
+        .into_diagnostic()
+        .context("failed to add CA certificate to root store")?;
+
+    Ok(roots)
 }
