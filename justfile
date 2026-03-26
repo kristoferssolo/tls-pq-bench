@@ -142,6 +142,33 @@ clean:
 setup:
     cargo install cargo-nextest sccache
 
+[group("dev")]
+gen-certs dir="certs" days="365":
+    mkdir -p {{ dir }}
+    openssl req -x509 -newkey rsa:2048 -nodes \
+        -keyout {{ dir }}/ca.key \
+        -out {{ dir }}/ca.pem \
+        -subj "/CN=tls-pq-bench CA" \
+        -days {{ days }}
+    openssl x509 -in {{ dir }}/ca.pem -outform DER -out {{ dir }}/ca.der
+    openssl req -new -newkey rsa:2048 -nodes \
+        -keyout {{ dir }}/server.key.pem \
+        -out {{ dir }}/server.csr \
+        -subj "/CN=localhost" \
+        -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1"
+    openssl x509 -req \
+        -in {{ dir }}/server.csr \
+        -CA {{ dir }}/ca.pem \
+        -CAkey {{ dir }}/ca.key \
+        -CAcreateserial \
+        -out {{ dir }}/server.pem \
+        -days {{ days }} \
+        -copy_extensions copy
+    openssl x509 -in {{ dir }}/server.pem -outform DER -out {{ dir }}/server.der
+    openssl pkcs8 -topk8 -inform PEM -outform DER -nocrypt \
+        -in {{ dir }}/server.key.pem \
+        -out {{ dir }}/server.key
+
 _setup:
     mkdir -p {{ results_dir }} {{ logs_dir }} {{ benchmarks_dir }}
 

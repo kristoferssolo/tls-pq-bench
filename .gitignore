@@ -21,3 +21,4 @@ target/
 benchmarks.toml
 results/
 .logs/
+certs/
