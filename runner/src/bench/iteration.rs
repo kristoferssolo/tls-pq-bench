@@ -14,7 +14,7 @@ use tokio::{
     net::TcpStream,
 };
 use tokio_rustls::TlsConnector;
-use tracing::debug;
+use tracing::{debug, instrument};
 use uuid::Uuid;
 
 /// Result of a single benchmark iteration.
@@ -25,6 +25,19 @@ pub struct IterationResult {
     ttlb: u128,
 }
 
+#[instrument(
+    skip(config, tls_connector, server_name),
+    fields(
+        run_id = %run_id,
+        iteration,
+        server = %config.server,
+        proto = %config.proto,
+        mode = %config.mode,
+        payload = config.payload,
+        concurrency = config.concurrency,
+        timeout_secs = config.timeout_secs,
+    )
+)]
 pub async fn run_single_iteration(
     iteration: u32,
     run_id: Uuid,
@@ -63,6 +76,10 @@ pub async fn run_single_iteration(
 }
 
 /// Run a single benchmark iteration over TLS.
+#[instrument(
+    skip(tls_connector, server_name),
+    fields(server = %server, proto = %proto, payload = payload_bytes, iteration)
+)]
 pub async fn run_iteration(
     server: SocketAddr,
     proto: ProtocolMode,

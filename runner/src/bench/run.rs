@@ -7,9 +7,23 @@ use miette::{Context, IntoDiagnostic};
 use rustls::pki_types::ServerName;
 use std::io::Write;
 use tokio_rustls::TlsConnector;
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
+#[instrument(
+    skip(tls_connector, server_name, output),
+    fields(
+        run_id = %run_id,
+        server = %config.server,
+        proto = %config.proto,
+        mode = %config.mode,
+        payload = config.payload,
+        iters = config.iters,
+        warmup = config.warmup,
+        concurrency = config.concurrency,
+        timeout_secs = config.timeout_secs,
+    )
+)]
 pub async fn run_benchmark<W: Write + Send>(
     run_id: Uuid,
     config: &BenchmarkConfig,
@@ -57,6 +71,18 @@ pub async fn run_benchmark<W: Write + Send>(
     Ok(())
 }
 
+#[instrument(
+    skip(tls_connector, server_name, output),
+    fields(
+        run_id = %run_id,
+        server = %config.server,
+        proto = %config.proto,
+        mode = %config.mode,
+        payload = config.payload,
+        iters = config.iters,
+        concurrency = config.concurrency,
+    )
+)]
 async fn run_and_write<W: Write + Send>(
     run_id: Uuid,
     config: &BenchmarkConfig,
