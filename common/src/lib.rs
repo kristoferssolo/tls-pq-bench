@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn bench_record_serializes_to_jsonl() {
         let record = BenchRecord {
-            run_id: Uuid::new_v4(),
+            run_id: Uuid::now_v7(),
             iteration: 0,
             proto: ProtocolMode::Raw,
             mode: KeyExchangeMode::X25519,
@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn bench_record_roundtrip() {
         let original = BenchRecord {
-            run_id: Uuid::new_v4(),
+            run_id: Uuid::now_v7(),
             iteration: 42,
             proto: ProtocolMode::Http1,
             mode: KeyExchangeMode::X25519Mlkem768,

@@ -30,7 +30,7 @@ use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
-    let run_id = Uuid::new_v4();
+    let run_id = Uuid::now_v7();
     init_tracing(std::io::stderr);
 
     info!(
