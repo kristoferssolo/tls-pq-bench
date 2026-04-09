@@ -8,6 +8,7 @@
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 
 
 class Protocol(StrEnum):
@@ -24,11 +25,28 @@ class Mode(StrEnum):
 
 class Verification(StrEnum):
     INSECURE = "insecure"
+    CACERT = "cacert"
+
+
+@dataclass(frozen=True, slots=True)
+class VerificationConfig:
+    kind: Verification
+    path: str | None = None
+
+    def render(self) -> str:
+        if self.kind == Verification.INSECURE:
+            return 'verification.kind = "insecure"'
+        if self.path is None:
+            raise ValueError("cacert verification requires a certificate path")
+        return f'verification = {{ kind = "{self.kind.value}", path = "{self.path}" }}'
+
+    def __str__(self) -> str:
+        return self.render()
 
 
 @dataclass(frozen=True, slots=True)
 class BenchmarkEntry:
-    verification: Verification
+    verification: VerificationConfig
     server: str
     proto: Protocol
     mode: Mode
@@ -41,9 +59,9 @@ class BenchmarkEntry:
         return "\n".join(
             [
                 "[[benchmarks]]",
-                f'verification.kind = "{self.verification.value}"',
+                self.verification.render(),
                 f'server = "{self.server}"',
-                f'proto = "{self.proto.value}"',
+                f'proto = "{self.proto}"',
                 f'mode = "{self.mode.value}"',
                 f"payload = {self.payload}",
                 f"iters = {self.iters}",
@@ -142,6 +160,11 @@ def parse_args() -> Namespace:
         default=Verification.INSECURE,
     )
     p.add_argument(
+        "--ca-cert",
+        type=Path,
+        help='Path to a CA certificate to emit as verification.kind = "cacert"',
+    )
+    p.add_argument(
         "-o",
         "--output",
         default="-",
@@ -150,6 +173,14 @@ def parse_args() -> Namespace:
     )
 
     return p.parse_args()
+
+
+def verification_from_args(args: Namespace) -> VerificationConfig:
+    if args.ca_cert is not None:
+        return VerificationConfig(kind=Verification.CACERT, path=str(args.ca_cert))
+    if args.verification == Verification.CACERT:
+        raise SystemExit("--verification cacert requires --ca-cert PATH")
+    return VerificationConfig(kind=args.verification)
 
 
 def build_port_map(
@@ -229,6 +260,7 @@ def render_header(
 
 
 def generate(args: Namespace) -> str:
+    verification = verification_from_args(args)
     port_map = build_port_map(
         args.host,
         args.base_port,
@@ -255,7 +287,7 @@ def generate(args: Namespace) -> str:
                 for concurrency in args.concurrencies:
                     blocks.append(
                         BenchmarkEntry(
-                            verification=args.verification,
+                            verification=verification,
                             server=server,
                             proto=proto,
                             mode=mode,
