@@ -1,10 +1,10 @@
 # Benchmark matrix for the main thesis baseline runs.
 #
 # Local port mapping:
-# - 127.0.0.1:4433 => proto='raw', mode='x25519'
-# - 127.0.0.1:4434 => proto='http1', mode='x25519'
-# - 127.0.0.1:4435 => proto='raw', mode='x25519mlkem768'
-# - 127.0.0.1:4436 => proto='http1', mode='x25519mlkem768'
+# - 127.0.0.1:4433 => proto=raw, mode=x25519
+# - 127.0.0.1:4434 => proto=http1, mode=x25519
+# - 127.0.0.1:4435 => proto=raw, mode=x25519mlkem768
+# - 127.0.0.1:4436 => proto=http1, mode=x25519mlkem768
 #
 # Experiment dimensions:
 # - protocol: raw, http1

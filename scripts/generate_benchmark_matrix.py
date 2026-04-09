@@ -7,6 +7,58 @@
 
 import sys
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True)
+class BenchmarkEntry:
+    verification: str
+    server: str
+    proto: str
+    mode: str
+    payload: int
+    iters: int
+    warmup: int
+    concurrency: int
+
+    def render(self) -> str:
+        return "\n".join(
+            [
+                "[[benchmarks]]",
+                f'verification.kind = "{self.verification}"',
+                f'server = "{self.server}"',
+                f'proto = "{self.proto}"',
+                f'mode = "{self.mode}"',
+                f"payload = {self.payload}",
+                f"iters = {self.iters}",
+                f"warmup = {self.warmup}",
+                f"concurrency = {self.concurrency}",
+            ]
+        )
+
+    def __str__(self) -> str:
+        return self.render()
+
+
+@dataclass(frozen=True, slots=True)
+class Endpoint:
+    host: str
+    port: int
+
+    def render(self) -> str:
+        return f"{self.host}:{self.port}"
+
+    def __str__(self) -> str:
+        return self.render()
+
+
+@dataclass(frozen=True, slots=True)
+class Variant:
+    proto: str
+    mode: str
+
+
+type PortMap = dict[Variant, Endpoint]
 
 
 def parse_args() -> Namespace:
@@ -20,7 +72,7 @@ def parse_args() -> Namespace:
         "--port",
         action="append",
         dest="ports",
-        metavar="PROTOL:MODE=PORT",
+        metavar="PROTO:MODE=PORT",
         help=(
             "Port for a proto:mode pair, e.g. raw:x25519=4433. Repeat for each "
             "combination. if ommited, ports are assigned sequentially from "
@@ -71,7 +123,7 @@ def build_port_map(
     modes: list[str],
     protocols: list[str],
     port_overrides: list[str] | None,
-) -> dict[tuple[str, str], str]:
+) -> PortMap:
     """Returns a (proto, mode) -> 'host:port' mapping.
 
     If --port flags are provided they must cover every (proto, mode) pair.
@@ -85,11 +137,11 @@ def build_port_map(
             try:
                 key, port_str = spec.split("=", 1)
                 proto, mode = key.split(":", 1)
-                mapping[(proto, mode)] = f"{host}:{int(port_str)}"
-            except ValueError:
+                mapping[Variant(proto, mode)] = Endpoint(host, int(port_str))
+            except ValueError as e:
                 raise SystemError(
                     f"error: invalid --port spec {spec!r}, expected PROTO:MODE=PORT"
-                )
+                ) from e
         missing = [
             f"{proto}:{mode}"
             for mode in modes
@@ -101,17 +153,18 @@ def build_port_map(
                 f"error: missing --port entries for: {', '.join(missing)}"
             )
         return mapping
+
     result = {}
     port = base_port
     for mode in modes:
         for proto in protocols:
-            result[(proto, mode)] = f"{host}:{port}"
+            result[Variant(proto, mode)] = Endpoint(host=host, port=port)
             port += 1
     return result
 
 
 def render_header(
-    port_map: dict[tuple[str, str], str],
+    port_map: PortMap,
     modes: list[str],
     protocols: list[str],
     payloads: list[int],
@@ -126,8 +179,8 @@ def render_header(
     ]
     for mode in modes:
         for proto in protocols:
-            addr = port_map[(proto, mode)]
-            lines.append(f"# - {addr} => {proto=}, {mode=}")
+            addr = port_map[Variant(proto, mode)]
+            lines.append(f"# - {addr} => proto={proto}, mode={mode}")
     lines += [
         "#",
         "# Experiment dimensions:",
@@ -138,22 +191,6 @@ def render_header(
         f"# - iterations: {iters} measured, {warmup} warmup",
     ]
     return "\n".join(lines)
-
-
-def render_benchmarks(entry: dict[str, str | int]) -> str:
-    return "\n".join(
-        [
-            "[[benchmarks]]",
-            f'verification.kind = "{entry["verification"]}"',
-            f'server = "{entry["server"]}"',
-            f'proto = "{entry["proto"]}"',
-            f'mode = "{entry["mode"]}"',
-            f"payload = {entry['payload']}",
-            f"iters = {entry['iters']}",
-            f"warmup = {entry['warmup']}",
-            f"concurrency = {entry['concurrency']}",
-        ]
-    )
 
 
 def generate(args: Namespace) -> str:
@@ -178,22 +215,20 @@ def generate(args: Namespace) -> str:
 
     for mode in args.modes:
         for proto in args.protocols:
-            server = port_map[(proto, mode)]
+            server = port_map[Variant(proto, mode)].render()
             for payload in args.payloads:
                 for concurrency in args.concurrencies:
                     blocks.append(
-                        render_benchmarks(
-                            {
-                                "verification": args.verification,
-                                "server": server,
-                                "proto": proto,
-                                "mode": mode,
-                                "payload": payload,
-                                "iters": args.iters,
-                                "warmup": args.warmup,
-                                "concurrency": concurrency,
-                            }
-                        )
+                        BenchmarkEntry(
+                            verification=args.verification,
+                            server=server,
+                            proto=proto,
+                            mode=mode,
+                            payload=payload,
+                            iters=args.iters,
+                            warmup=args.warmup,
+                            concurrency=concurrency,
+                        ).render()
                     )
 
     return "\n\n".join(blocks) + "\n"
