@@ -30,7 +30,7 @@ build:
 server mode="x25519" proto="raw" listen="127.0.0.1:4433": build
     {{ server }} --mode {{ mode }} --proto {{ proto }} --listen {{ listen }}
 
-# Start all four server instances (x25519+mlkem × raw+http1)
+# Start all eight server instances (4 modes × raw+http1)
 [group("run")]
 multi-server: build
     #!/usr/bin/env bash
@@ -49,13 +49,21 @@ multi-server: build
     echo "Starting benchmark servers:"
     echo "    x25519 raw   -> 127.0.0.1:4433"
     echo "    x25519 http1 -> 127.0.0.1:4434"
-    echo "    mlkem raw    -> 127.0.0.1:4435"
-    echo "    mlkem http1  -> 127.0.0.1:4436"
+    echo "    secp256r1 raw -> 127.0.0.1:4435"
+    echo "    secp256r1 http1 -> 127.0.0.1:4436"
+    echo "    x25519mlkem768 raw -> 127.0.0.1:4437"
+    echo "    x25519mlkem768 http1 -> 127.0.0.1:4438"
+    echo "    secp256r1mlkem768 raw -> 127.0.0.1:4439"
+    echo "    secp256r1mlkem768 http1 -> 127.0.0.1:4440"
 
     LOG_FORMAT=compact {{ server }} --mode x25519         --proto raw   --listen 127.0.0.1:4433 > {{ logs_dir }}/server-x25519-raw.log 2>&1           & pids+=($!)
     LOG_FORMAT=compact {{ server }} --mode x25519         --proto http1 --listen 127.0.0.1:4434 > {{ logs_dir }}/server-x25519-http1.log 2>&1         & pids+=($!)
-    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768 --proto raw   --listen 127.0.0.1:4435 > {{ logs_dir }}/server-x25519mlkem768-raw.log 2>&1   & pids+=($!)
-    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768 --proto http1 --listen 127.0.0.1:4436 > {{ logs_dir }}/server-x25519mlkem768-http1.log 2>&1 & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode secp256r1      --proto raw   --listen 127.0.0.1:4435 > {{ logs_dir }}/server-secp256r1-raw.log 2>&1        & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode secp256r1      --proto http1 --listen 127.0.0.1:4436 > {{ logs_dir }}/server-secp256r1-http1.log 2>&1      & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768 --proto raw   --listen 127.0.0.1:4437 > {{ logs_dir }}/server-x25519mlkem768-raw.log 2>&1   & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768 --proto http1 --listen 127.0.0.1:4438 > {{ logs_dir }}/server-x25519mlkem768-http1.log 2>&1 & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto raw   --listen 127.0.0.1:4439 > {{ logs_dir }}/server-secp256r1mlkem768-raw.log 2>&1   & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto http1 --listen 127.0.0.1:4440 > {{ logs_dir }}/server-secp256r1mlkem768-http1.log 2>&1 & pids+=($!)
 
     wait
 
@@ -99,15 +107,31 @@ smoke-http1-x25519:
 
 [group("bench")]
 smoke-raw-mlkem:
-    just _bench 127.0.0.1:4435 raw x25519mlkem768 smoke-raw-mlkem.jsonl
+    just _bench 127.0.0.1:4437 raw x25519mlkem768 smoke-raw-mlkem.jsonl
 
 [group("bench")]
 smoke-http1-mlkem:
-    just _bench 127.0.0.1:4436 http1 x25519mlkem768 smoke-http1-mlkem.jsonl
+    just _bench 127.0.0.1:4438 http1 x25519mlkem768 smoke-http1-mlkem.jsonl
+
+[group("bench")]
+smoke-raw-secp256r1:
+    just _bench 127.0.0.1:4435 raw secp256r1 smoke-raw-secp256r1.jsonl
+
+[group("bench")]
+smoke-http1-secp256r1:
+    just _bench 127.0.0.1:4436 http1 secp256r1 smoke-http1-secp256r1.jsonl
+
+[group("bench")]
+smoke-raw-secp256r1-mlkem:
+    just _bench 127.0.0.1:4439 raw secp256r1mlkem768 smoke-raw-secp256r1-mlkem.jsonl
+
+[group("bench")]
+smoke-http1-secp256r1-mlkem:
+    just _bench 127.0.0.1:4440 http1 secp256r1mlkem768 smoke-http1-secp256r1-mlkem.jsonl
 
 # Run all smoke benchmarks
 [group("bench")]
-smoke-all: smoke-raw-x25519 smoke-http1-x25519 smoke-raw-mlkem smoke-http1-mlkem
+smoke-all: smoke-raw-x25519 smoke-http1-x25519 smoke-raw-secp256r1 smoke-http1-secp256r1 smoke-raw-mlkem smoke-http1-mlkem smoke-raw-secp256r1-mlkem smoke-http1-secp256r1-mlkem
 
 # Run all checks (fmt, clippy, docs, test)
 [group("dev")]

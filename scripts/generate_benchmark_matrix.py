@@ -7,6 +7,7 @@
 
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from dataclasses import dataclass
+from enum import StrEnum, auto
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +38,13 @@ class BenchmarkEntry:
 
     def __str__(self) -> str:
         return self.render()
+
+
+class Mode(StrEnum):
+    X25519 = auto()
+    SECP256R1 = auto()
+    X25519MLKEM768 = auto()
+    SECP256R1MLKEM768 = auto()
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,7 +94,15 @@ def parse_args() -> Namespace:
     )
     p.add_argument("--protocols", nargs="+", default=["raw", "http1"], metavar="PROTO")
     p.add_argument(
-        "--modes", nargs="+", default=["x25519", "x25519mlkem768"], metavar="MODE"
+        "--modes",
+        nargs="+",
+        default=[
+            "x25519",
+            "secp256r1",
+            "x25519mlkem768",
+            "secp256r1mlkem768",
+        ],
+        metavar="MODE",
     )
     p.add_argument(
         "--payloads",
