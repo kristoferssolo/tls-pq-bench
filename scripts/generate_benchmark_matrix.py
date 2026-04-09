@@ -5,7 +5,6 @@
 # ///
 """Generate a benchmark matrix TOML file from parameterized dimensions."""
 
-import sys
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from dataclasses import dataclass
 
@@ -239,7 +238,7 @@ def main() -> None:
     output = generate(args)
 
     if args.output == "-":
-        sys.stdout.write(output)
+        print(output)
     else:
         with open(args.output, "w") as f:
             f.write(output)
