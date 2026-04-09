@@ -18,9 +18,15 @@ use uuid::Uuid;
 pub enum KeyExchangeMode {
     /// Classical X25519 ECDH.
     X25519,
+    #[value(name = "secp256r1")]
+    /// Classical NIST P-256 ECDH.
+    Secp256r1,
     #[value(name = "x25519mlkem768")]
     /// Hybrid post-quantum: X25519 + ML-KEM-768.
     X25519Mlkem768,
+    #[value(name = "secp256r1mlkem768")]
+    /// Hybrid post-quantum: P-256 + ML-KEM-768.
+    Secp256r1Mlkem768,
 }
 
 /// Application protocol carried over TLS in benchmark runs.
@@ -201,6 +207,13 @@ mod tests {
             value["mode"].clone()
         ));
         assert_eq!(mode, KeyExchangeMode::X25519Mlkem768);
+
+        let json = r#"{"mode":"secp256r1mlkem768"}"#;
+        let value = assert_ok!(serde_json::from_str::<Value>(json));
+        let mode = assert_ok!(serde_json::from_value::<KeyExchangeMode>(
+            value["mode"].clone()
+        ));
+        assert_eq!(mode, KeyExchangeMode::Secp256r1Mlkem768);
     }
 
     #[test]
@@ -208,10 +221,18 @@ mod tests {
         let mode_lower = assert_ok!(serde_json::from_str::<KeyExchangeMode>(r#""x25519""#));
         assert_eq!(mode_lower, KeyExchangeMode::X25519);
 
+        let mode_p256_lower = assert_ok!(serde_json::from_str::<KeyExchangeMode>(r#""secp256r1""#));
+        assert_eq!(mode_p256_lower, KeyExchangeMode::Secp256r1);
+
         let mode_mlkem_lower = assert_ok!(serde_json::from_str::<KeyExchangeMode>(
             r#""x25519mlkem768""#
         ));
         assert_eq!(mode_mlkem_lower, KeyExchangeMode::X25519Mlkem768);
+
+        let mode_p256_mlkem_lower = assert_ok!(serde_json::from_str::<KeyExchangeMode>(
+            r#""secp256r1mlkem768""#
+        ));
+        assert_eq!(mode_p256_mlkem_lower, KeyExchangeMode::Secp256r1Mlkem768);
     }
 
     #[test]
@@ -236,6 +257,12 @@ mod tests {
 
         let mode = assert_ok!(KeyExchangeMode::from_str("x25519mlkem768", true));
         assert_eq!(mode, KeyExchangeMode::X25519Mlkem768);
+
+        let mode = assert_ok!(KeyExchangeMode::from_str("secp256r1", true));
+        assert_eq!(mode, KeyExchangeMode::Secp256r1);
+
+        let mode = assert_ok!(KeyExchangeMode::from_str("secp256r1mlkem768", true));
+        assert_eq!(mode, KeyExchangeMode::Secp256r1Mlkem768);
     }
 
     #[test]

@@ -4,7 +4,7 @@ use rustls::{
     ServerConfig,
     crypto::aws_lc_rs::{
         self,
-        kx_group::{X25519, X25519MLKEM768},
+        kx_group::{SECP256R1, SECP256R1MLKEM768, X25519, X25519MLKEM768},
     },
     pki_types::{CertificateDer, PrivateKeyDer},
     version::TLS13,
@@ -19,7 +19,9 @@ pub fn build_tls_config(
     let mut provider = aws_lc_rs::default_provider();
     provider.kx_groups = match mode {
         KeyExchangeMode::X25519 => vec![X25519],
+        KeyExchangeMode::Secp256r1 => vec![SECP256R1],
         KeyExchangeMode::X25519Mlkem768 => vec![X25519MLKEM768],
+        KeyExchangeMode::Secp256r1Mlkem768 => vec![SECP256R1MLKEM768],
     };
 
     let certs = server_cert

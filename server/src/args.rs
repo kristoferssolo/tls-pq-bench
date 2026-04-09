@@ -61,11 +61,11 @@ mod tests {
         let args = Args::parse_from([
             "server",
             "--mode",
-            "x25519mlkem768",
+            "secp256r1mlkem768",
             "--listen",
             "0.0.0.0:8080",
         ]);
-        assert_eq!(args.mode, KeyExchangeMode::X25519Mlkem768);
+        assert_eq!(args.mode, KeyExchangeMode::Secp256r1Mlkem768);
         assert_eq!(args.listen.to_string(), "0.0.0.0:8080");
     }
 
@@ -86,6 +86,28 @@ mod tests {
         let server_cert = assert_ok!(ca.sign_server_cert("localhost"), "sign cert");
         let config = assert_ok!(
             build_tls_config(KeyExchangeMode::X25519Mlkem768, &server_cert),
+            "build config"
+        );
+        assert!(Arc::strong_count(&config) >= 1);
+    }
+
+    #[test]
+    fn tls_config_p256() {
+        let ca = assert_ok!(CaCertificate::generate(), "generate CA");
+        let server_cert = assert_ok!(ca.sign_server_cert("localhost"), "sign cert");
+        let config = assert_ok!(
+            build_tls_config(KeyExchangeMode::Secp256r1, &server_cert),
+            "build config"
+        );
+        assert!(Arc::strong_count(&config) >= 1);
+    }
+
+    #[test]
+    fn tls_config_p256_mlkem() {
+        let ca = assert_ok!(CaCertificate::generate(), "generate CA");
+        let server_cert = assert_ok!(ca.sign_server_cert("localhost"), "sign cert");
+        let config = assert_ok!(
+            build_tls_config(KeyExchangeMode::Secp256r1Mlkem768, &server_cert),
             "build config"
         );
         assert!(Arc::strong_count(&config) >= 1);
