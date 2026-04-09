@@ -27,15 +27,41 @@ build:
 
 # Start a single server instance
 [group("run")]
-server mode="x25519" proto="raw" listen="127.0.0.1:4433": build
-    {{ server }} --mode {{ mode }} --proto {{ proto }} --listen {{ listen }}
+server mode="x25519" proto="raw" listen="127.0.0.1:4433" cert="" key="": build
+    #!/usr/bin/env bash
+    if [[ "{{ cert }}" != "" || "{{ key }}" != "" ]]; then
+        if [[ "{{ cert }}" == "" || "{{ key }}" == "" ]]; then
+            echo "server requires both cert and key, or neither" >&2
+            exit 1
+        fi
+        exec {{ server }} --mode {{ mode }} --proto {{ proto }} --listen {{ listen }} --cert {{ cert }} --key {{ key }}
+    fi
+    exec {{ server }} --mode {{ mode }} --proto {{ proto }} --listen {{ listen }}
 
 # Start all eight server instances (4 modes × raw+http1)
 [group("run")]
-multi-server: build
+multi-server cert="" key="": build
     #!/usr/bin/env bash
     just _setup
     pids=()
+    names=()
+
+    cert_args=()
+    if [[ "{{ cert }}" != "" || "{{ key }}" != "" ]]; then
+        if [[ "{{ cert }}" == "" || "{{ key }}" == "" ]]; then
+            echo "multi-server requires both cert and key, or neither" >&2
+            exit 1
+        fi
+        if [[ ! -f "{{ cert }}" ]]; then
+            echo "certificate file not found: {{ cert }}" >&2
+            exit 1
+        fi
+        if [[ ! -f "{{ key }}" ]]; then
+            echo "private key file not found: {{ key }}" >&2
+            exit 1
+        fi
+        cert_args=(--cert "{{ cert }}" --key "{{ key }}")
+    fi
 
     cleanup() {
         for pid in "${pids[@]}"; do
@@ -56,14 +82,36 @@ multi-server: build
     echo "    secp256r1mlkem768 raw -> 127.0.0.1:4439"
     echo "    secp256r1mlkem768 http1 -> 127.0.0.1:4440"
 
-    LOG_FORMAT=compact {{ server }} --mode x25519         --proto raw   --listen 127.0.0.1:4433 > {{ logs_dir }}/server-x25519-raw.log 2>&1           & pids+=($!)
-    LOG_FORMAT=compact {{ server }} --mode x25519         --proto http1 --listen 127.0.0.1:4434 > {{ logs_dir }}/server-x25519-http1.log 2>&1         & pids+=($!)
-    LOG_FORMAT=compact {{ server }} --mode secp256r1      --proto raw   --listen 127.0.0.1:4435 > {{ logs_dir }}/server-secp256r1-raw.log 2>&1        & pids+=($!)
-    LOG_FORMAT=compact {{ server }} --mode secp256r1      --proto http1 --listen 127.0.0.1:4436 > {{ logs_dir }}/server-secp256r1-http1.log 2>&1      & pids+=($!)
-    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768 --proto raw   --listen 127.0.0.1:4437 > {{ logs_dir }}/server-x25519mlkem768-raw.log 2>&1   & pids+=($!)
-    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768 --proto http1 --listen 127.0.0.1:4438 > {{ logs_dir }}/server-x25519mlkem768-http1.log 2>&1 & pids+=($!)
-    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto raw   --listen 127.0.0.1:4439 > {{ logs_dir }}/server-secp256r1mlkem768-raw.log 2>&1   & pids+=($!)
-    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto http1 --listen 127.0.0.1:4440 > {{ logs_dir }}/server-secp256r1mlkem768-http1.log 2>&1 & pids+=($!)
+    LOG_FORMAT=compact {{ server }} --mode x25519            --proto raw   --listen 127.0.0.1:4433 "${cert_args[@]}" > {{ logs_dir }}/server-x25519-raw.log 2>&1              & pids+=($!); names+=("x25519 raw")
+    LOG_FORMAT=compact {{ server }} --mode x25519            --proto http1 --listen 127.0.0.1:4434 "${cert_args[@]}" > {{ logs_dir }}/server-x25519-http1.log 2>&1            & pids+=($!); names+=("x25519 http1")
+    LOG_FORMAT=compact {{ server }} --mode secp256r1         --proto raw   --listen 127.0.0.1:4435 "${cert_args[@]}" > {{ logs_dir }}/server-secp256r1-raw.log 2>&1           & pids+=($!); names+=("secp256r1 raw")
+    LOG_FORMAT=compact {{ server }} --mode secp256r1         --proto http1 --listen 127.0.0.1:4436 "${cert_args[@]}" > {{ logs_dir }}/server-secp256r1-http1.log 2>&1         & pids+=($!); names+=("secp256r1 http1")
+    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768    --proto raw   --listen 127.0.0.1:4437 "${cert_args[@]}" > {{ logs_dir }}/server-x25519mlkem768-raw.log 2>&1      & pids+=($!); names+=("x25519mlkem768 raw")
+    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768    --proto http1 --listen 127.0.0.1:4438 "${cert_args[@]}" > {{ logs_dir }}/server-x25519mlkem768-http1.log 2>&1    & pids+=($!); names+=("x25519mlkem768 http1")
+    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto raw   --listen 127.0.0.1:4439 "${cert_args[@]}" > {{ logs_dir }}/server-secp256r1mlkem768-raw.log 2>&1   & pids+=($!); names+=("secp256r1mlkem768 raw")
+    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto http1 --listen 127.0.0.1:4440 "${cert_args[@]}" > {{ logs_dir }}/server-secp256r1mlkem768-http1.log 2>&1 & pids+=($!); names+=("secp256r1mlkem768 http1")
+
+    sleep 1
+
+    for idx in "${!pids[@]}"; do
+        if ! kill -0 "${pids[$idx]}" 2>/dev/null; then
+            echo "server exited during startup: ${names[$idx]}" >&2
+            wait "${pids[$idx]}" || true
+            case "${names[$idx]}" in
+                "x25519 raw") log="{{ logs_dir }}/server-x25519-raw.log" ;;
+                "x25519 http1") log="{{ logs_dir }}/server-x25519-http1.log" ;;
+                "secp256r1 raw") log="{{ logs_dir }}/server-secp256r1-raw.log" ;;
+                "secp256r1 http1") log="{{ logs_dir }}/server-secp256r1-http1.log" ;;
+                "x25519mlkem768 raw") log="{{ logs_dir }}/server-x25519mlkem768-raw.log" ;;
+                "x25519mlkem768 http1") log="{{ logs_dir }}/server-x25519mlkem768-http1.log" ;;
+                "secp256r1mlkem768 raw") log="{{ logs_dir }}/server-secp256r1mlkem768-raw.log" ;;
+                "secp256r1mlkem768 http1") log="{{ logs_dir }}/server-secp256r1mlkem768-http1.log" ;;
+            esac
+            echo "--- ${log} ---" >&2
+            cat "${log}" >&2 || true
+            exit 1
+        fi
+    done
 
     wait
 
@@ -96,41 +144,45 @@ baseline-matrix: build
     echo "Writing baseline matrix results to $out"
     {{ runner }} --config {{ benchmarks_dir }}/baseline.toml > "$out"
 
-# Smoke benchmarks - requires multi-server to be running
 [group("bench")]
+generate-matrix out="-":
+    uv run --script scripts/generate_benchmark_matrix.py -o {{ out }}
+
+[group("smoke")]
 smoke-raw-x25519:
     just _bench 127.0.0.1:4433 raw x25519 smoke-raw-x25519.jsonl
 
-[group("bench")]
+[group("smoke")]
 smoke-http1-x25519:
     just _bench 127.0.0.1:4434 http1 x25519 smoke-http1-x25519.jsonl
 
-[group("bench")]
+[group("smoke")]
 smoke-raw-mlkem:
     just _bench 127.0.0.1:4437 raw x25519mlkem768 smoke-raw-mlkem.jsonl
 
-[group("bench")]
+[group("smoke")]
 smoke-http1-mlkem:
     just _bench 127.0.0.1:4438 http1 x25519mlkem768 smoke-http1-mlkem.jsonl
 
-[group("bench")]
+[group("smoke")]
 smoke-raw-secp256r1:
     just _bench 127.0.0.1:4435 raw secp256r1 smoke-raw-secp256r1.jsonl
 
-[group("bench")]
+[group("smoke")]
 smoke-http1-secp256r1:
     just _bench 127.0.0.1:4436 http1 secp256r1 smoke-http1-secp256r1.jsonl
 
-[group("bench")]
+[group("smoke")]
 smoke-raw-secp256r1-mlkem:
     just _bench 127.0.0.1:4439 raw secp256r1mlkem768 smoke-raw-secp256r1-mlkem.jsonl
 
-[group("bench")]
+[group("smoke")]
 smoke-http1-secp256r1-mlkem:
     just _bench 127.0.0.1:4440 http1 secp256r1mlkem768 smoke-http1-secp256r1-mlkem.jsonl
 
+# Smoke benchmarks - requires multi-server to be running
 # Run all smoke benchmarks
-[group("bench")]
+[group("smoke")]
 smoke-all: smoke-raw-x25519 smoke-http1-x25519 smoke-raw-secp256r1 smoke-http1-secp256r1 smoke-raw-mlkem smoke-http1-mlkem smoke-raw-secp256r1-mlkem smoke-http1-secp256r1-mlkem
 
 # Run all checks (fmt, clippy, docs, test)
@@ -140,10 +192,6 @@ check: fmt clippy docs test
 [group("dev")]
 fmt:
     cargo fmt --all
-
-[group("dev")]
-fmt-check:
-    cargo fmt --all -- --check
 
 [group("dev")]
 clippy:
@@ -167,7 +215,7 @@ setup:
     cargo install cargo-nextest sccache
 
 [group("dev")]
-gen-certs dir="certs" days="365":
+generate-certs dir="certs" days="365":
     mkdir -p {{ dir }}
     openssl req -x509 -newkey rsa:2048 -nodes \
         -keyout {{ dir }}/ca.key \
@@ -192,11 +240,6 @@ gen-certs dir="certs" days="365":
     openssl pkcs8 -topk8 -inform PEM -outform DER -nocrypt \
         -in {{ dir }}/server.key.pem \
         -out {{ dir }}/server.key
-
-[group("bench")]
-generate-matrix out="-":
-    uv run --script scripts/generate_benchmark_matrix.py \
-        -o {{ out }}
 
 _setup:
     mkdir -p {{ results_dir }} {{ logs_dir }} {{ benchmarks_dir }}
