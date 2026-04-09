@@ -11,7 +11,7 @@ import math
 import sys
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from dataclasses import dataclass
-from enum import StrEnum, auto
+from enum import StrEnum
 from pathlib import Path
 from statistics import fmean
 from typing import Any, Iterator, NamedTuple
@@ -23,9 +23,9 @@ STAT_COLUMNS = ["metric", "n", "unit", "mean"]
 
 
 class Unit(StrEnum):
-    NS = auto()
-    US = auto()
-    MS = auto()
+    NS = "ns"
+    US = "us"
+    MS = "ms"
 
     def __str__(self) -> str:
         return self.value
@@ -36,10 +36,10 @@ class Unit(StrEnum):
 
 
 class OutputFormat(StrEnum):
-    TABLE = auto()
-    MARKDOWN = auto()
-    JSON = auto()
-    CSV = auto()
+    TABLE = "table"
+    MARKDOWN = "markdown"
+    JSON = "json"
+    CSV = "csv"
 
     def __str__(self) -> str:
         return self.value

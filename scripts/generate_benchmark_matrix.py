@@ -7,15 +7,31 @@
 
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from dataclasses import dataclass
-from enum import StrEnum, auto
+from enum import StrEnum
+
+
+class Protocol(StrEnum):
+    RAW = "raw"
+    HTTP1 = "http1"
+
+
+class Mode(StrEnum):
+    X25519 = "x25519"
+    SECP256R1 = "secp256r1"
+    X25519MLKEM768 = "x25519mlkem768"
+    SECP256R1MLKEM768 = "secp256r1mlkem768"
+
+
+class Verification(StrEnum):
+    INSECURE = "insecure"
 
 
 @dataclass(frozen=True, slots=True)
 class BenchmarkEntry:
-    verification: str
+    verification: Verification
     server: str
-    proto: str
-    mode: str
+    proto: Protocol
+    mode: Mode
     payload: int
     iters: int
     warmup: int
@@ -25,10 +41,10 @@ class BenchmarkEntry:
         return "\n".join(
             [
                 "[[benchmarks]]",
-                f'verification.kind = "{self.verification}"',
+                f'verification.kind = "{self.verification.value}"',
                 f'server = "{self.server}"',
-                f'proto = "{self.proto}"',
-                f'mode = "{self.mode}"',
+                f'proto = "{self.proto.value}"',
+                f'mode = "{self.mode.value}"',
                 f"payload = {self.payload}",
                 f"iters = {self.iters}",
                 f"warmup = {self.warmup}",
@@ -38,13 +54,6 @@ class BenchmarkEntry:
 
     def __str__(self) -> str:
         return self.render()
-
-
-class Mode(StrEnum):
-    X25519 = auto()
-    SECP256R1 = auto()
-    X25519MLKEM768 = auto()
-    SECP256R1MLKEM768 = auto()
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,8 +70,8 @@ class Endpoint:
 
 @dataclass(frozen=True, slots=True)
 class Variant:
-    proto: str
-    mode: str
+    proto: Protocol
+    mode: Mode
 
 
 type PortMap = dict[Variant, Endpoint]
@@ -92,15 +101,22 @@ def parse_args() -> Namespace:
         default=4433,
         help="Used only when --port is not provided",
     )
-    p.add_argument("--protocols", nargs="+", default=["raw", "http1"], metavar="PROTO")
+    p.add_argument(
+        "--protocols",
+        nargs="+",
+        type=Protocol,
+        default=[Protocol.RAW, Protocol.HTTP1],
+        metavar="PROTO",
+    )
     p.add_argument(
         "--modes",
         nargs="+",
+        type=Mode,
         default=[
-            "x25519",
-            "secp256r1",
-            "x25519mlkem768",
-            "secp256r1mlkem768",
+            Mode.X25519,
+            Mode.SECP256R1,
+            Mode.X25519MLKEM768,
+            Mode.SECP256R1MLKEM768,
         ],
         metavar="MODE",
     )
@@ -120,7 +136,11 @@ def parse_args() -> Namespace:
     )
     p.add_argument("--iters", type=int, default=200)
     p.add_argument("--warmup", type=int, default=20)
-    p.add_argument("--verification", default="insecure")
+    p.add_argument(
+        "--verification",
+        type=Verification,
+        default=Verification.INSECURE,
+    )
     p.add_argument(
         "-o",
         "--output",
@@ -135,8 +155,8 @@ def parse_args() -> Namespace:
 def build_port_map(
     host: str,
     base_port: int,
-    modes: list[str],
-    protocols: list[str],
+    modes: list[Mode],
+    protocols: list[Protocol],
     port_overrides: list[str] | None,
 ) -> PortMap:
     """Returns a (proto, mode) -> 'host:port' mapping.
@@ -152,16 +172,16 @@ def build_port_map(
             try:
                 key, port_str = spec.split("=", 1)
                 proto, mode = key.split(":", 1)
-                mapping[Variant(proto, mode)] = Endpoint(host, int(port_str))
+                mapping[Variant(Protocol(proto), Mode(mode))] = Endpoint(
+                    host, int(port_str)
+                )
             except ValueError as e:
-                raise SystemError(
-                    f"error: invalid --port spec {spec!r}, expected PROTO:MODE=PORT"
-                ) from e
+                raise SystemError(f"error: invalid --port spec {spec!r}") from e
         missing = [
-            f"{proto}:{mode}"
+            f"{proto.value}:{mode.value}"
             for mode in modes
             for proto in protocols
-            if (proto, mode) not in mapping
+            if Variant(proto, mode) not in mapping
         ]
         if missing:
             raise SystemError(
@@ -180,8 +200,8 @@ def build_port_map(
 
 def render_header(
     port_map: PortMap,
-    modes: list[str],
-    protocols: list[str],
+    modes: list[Mode],
+    protocols: list[Protocol],
     payloads: list[int],
     concurrencies: list[int],
     iters: int,
@@ -195,12 +215,12 @@ def render_header(
     for mode in modes:
         for proto in protocols:
             addr = port_map[Variant(proto, mode)]
-            lines.append(f"# - {addr} => proto={proto}, mode={mode}")
+            lines.append(f"# - {addr} => proto={proto.value}, mode={mode.value}")
     lines += [
         "#",
         "# Experiment dimensions:",
-        f"# - protocol: {', '.join(protocols)}",
-        f"# - mode: {', '.join(modes)}",
+        f"# - protocol: {', '.join(proto.value for proto in protocols)}",
+        f"# - mode: {', '.join(mode.value for mode in modes)}",
         f"# - payload: {', '.join(str(p) for p in payloads)} bytes",
         f"# - concurrency: {', '.join(str(c) for c in concurrencies)}",
         f"# - iterations: {iters} measured, {warmup} warmup",
