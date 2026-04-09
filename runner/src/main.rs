@@ -71,7 +71,21 @@ async fn main() -> miette::Result<()> {
         let tls_config = build_tls_config(benchmark.mode, &benchmark.verification)?;
         let tls_connector = TlsConnector::from(Arc::new(tls_config));
 
-        run_benchmark(run_id, benchmark, &tls_connector, &server_name, &mut output).await?;
+        run_benchmark(run_id, benchmark, &tls_connector, &server_name, &mut output)
+            .await
+            .with_context(|| {
+                format!(
+                    "benchmark failed: server={} proto={} mode={} payload={} concurrency={} iters={} warmup={} timeout_secs={}",
+                    benchmark.server,
+                    benchmark.proto,
+                    benchmark.mode,
+                    benchmark.payload,
+                    benchmark.concurrency,
+                    benchmark.iters,
+                    benchmark.warmup,
+                    benchmark.timeout_secs,
+                )
+            })?;
     }
 
     Ok(())

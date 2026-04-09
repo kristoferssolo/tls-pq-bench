@@ -35,7 +35,7 @@ pub struct Args {
     pub concurrency: u32,
 
     /// Per-iteration timeout in seconds
-    #[arg(long, default_value = "300")]
+    #[arg(long, default_value = "30")]
     pub timeout_secs: u64,
 
     /// Output file for JSONL records (stdout if not specified)

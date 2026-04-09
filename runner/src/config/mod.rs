@@ -11,7 +11,7 @@ use serde::Deserialize;
 use std::{fs::read_to_string, net::SocketAddr, path::Path};
 
 const fn default_timeout_secs() -> u64 {
-    300
+    30
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -142,7 +142,7 @@ server = "127.0.0.1:4433"
         assert_eq!(config.benchmarks.len(), 1);
         assert_eq!(config.benchmarks[0].mode, KeyExchangeMode::X25519);
         assert_eq!(config.benchmarks[0].payload, 1024);
-        assert_eq!(config.benchmarks[0].timeout_secs, 300);
+        assert_eq!(config.benchmarks[0].timeout_secs, 30);
     }
 
     #[test]
@@ -157,7 +157,7 @@ server = "127.0.0.1:4433"
         assert_eq!(bench_0.verification, VerificationMode::Insecure);
         assert_eq!(bench_1.mode, KeyExchangeMode::X25519Mlkem768);
         assert_eq!(bench_1.proto, ProtocolMode::Http1);
-        assert_eq!(bench_0.timeout_secs, 300);
+        assert_eq!(bench_0.timeout_secs, 30);
         assert_eq!(bench_1.timeout_secs, 120);
         assert_eq!(
             bench_1.verification,
@@ -238,7 +238,7 @@ server = "127.0.0.1:4433"
             iters: 100,
             warmup: 10,
             concurrency: 1,
-            timeout_secs: 300,
+            timeout_secs: 30,
             out: None,
             config: None,
             ca_cert: None,
@@ -260,7 +260,7 @@ server = "127.0.0.1:4433"
             iters: 100,
             warmup: 10,
             concurrency: 1,
-            timeout_secs: 300,
+            timeout_secs: 30,
             out: None,
             config: None,
             ca_cert: Some(PathBuf::from("certs/ca.der")),
