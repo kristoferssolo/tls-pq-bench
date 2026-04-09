@@ -36,6 +36,7 @@ class Unit(StrEnum):
 
 
 class OutputFormat(StrEnum):
+    TABLE = auto()
     MARKDOWN = auto()
     JSON = auto()
     CSV = auto()
@@ -115,7 +116,7 @@ def parse_args() -> Namespace:
         "--format",
         type=OutputFormat,
         choices=list(OutputFormat),
-        default=OutputFormat.MARKDOWN,
+        default=OutputFormat.TABLE,
         metavar=f"{{{','.join(str(f) for f in OutputFormat)}}}",
         help="Output format",
     )
@@ -262,6 +263,29 @@ def render_markdown(rows: list[SummaryRow], group_by: list[str]) -> str:
     return "\n".join(lines)
 
 
+def render_table(rows: list[SummaryRow], group_by: list[str]) -> str:
+    columns = output_columns(group_by)
+    rendered_rows = []
+
+    for row in rows:
+        flat = row.to_flat_dict()
+        rendered_rows.append([format_cell(flat[column]) for column in columns])
+
+    widths = [
+        max(len(column), *(len(row[idx]) for row in rendered_rows))
+        for idx, column in enumerate(columns)
+    ]
+
+    def format_row(values: list[str]) -> str:
+        cells = [value.ljust(widths[idx]) for idx, value in enumerate(values)]
+        return "| " + " | ".join(cells) + " |"
+
+    header = format_row(columns)
+    separator = "|-" + "-|-".join("-" * width for width in widths) + "-|"
+    body = [format_row(row) for row in rendered_rows]
+    return "\n".join([header, separator, *body])
+
+
 def write_csv(rows: list[SummaryRow], group_by: list[str]) -> None:
     columns = output_columns(group_by)
     writer = csv.DictWriter(sys.stdout, fieldnames=columns)
@@ -276,16 +300,16 @@ def main() -> None:
     grouped = group_records(records, args.group_by)
     rows = summarize(grouped, args.group_by, args.metrics, args.unit)
 
-    if args.format == OutputFormat.JSON:
-        json.dump([row.to_flat_dict() for row in rows], sys.stdout, indent=2)
-        print()
-        return
-
-    if args.format == OutputFormat.CSV:
-        write_csv(rows, args.group_by)
-        return
-
-    print(render_markdown(rows, args.group_by))
+    match args.format:
+        case OutputFormat.JSON:
+            json.dump([row.to_flat_dict() for row in rows], sys.stdout, indent=2)
+            print()
+        case OutputFormat.CSV:
+            write_csv(rows, args.group_by)
+        case OutputFormat.MARKDOWN:
+            print(render_markdown(rows, args.group_by))
+        case OutputFormat.TABLE:
+            print(render_table(rows, args.group_by))
 
 
 if __name__ == "__main__":
