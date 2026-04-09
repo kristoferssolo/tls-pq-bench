@@ -169,6 +169,11 @@ gen-certs dir="certs" days="365":
         -in {{ dir }}/server.key.pem \
         -out {{ dir }}/server.key
 
+[group("bench")]
+generate-matrix out="-":
+    uv run --script scripts/generate_benchmark_matrix.py \
+        -o {{ out }} \
+
 _setup:
     mkdir -p {{ results_dir }} {{ logs_dir }} {{ benchmarks_dir }}
 

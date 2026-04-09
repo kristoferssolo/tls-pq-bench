@@ -1,19 +1,20 @@
 # Benchmark matrix for the main thesis baseline runs.
 #
-# Local port mapping assumes `just multi-server`:
-# - 127.0.0.1:4433 => proto=raw,   mode=x25519
-# - 127.0.0.1:4434 => proto=http1, mode=x25519
-# - 127.0.0.1:4435 => proto=raw,   mode=x25519mlkem768
-# - 127.0.0.1:4436 => proto=http1, mode=x25519mlkem768
+# Local port mapping:
+# - 127.0.0.1:4433 => proto='raw', mode='x25519'
+# - 127.0.0.1:4434 => proto='http1', mode='x25519'
+# - 127.0.0.1:4435 => proto='raw', mode='x25519mlkem768'
+# - 127.0.0.1:4436 => proto='http1', mode='x25519mlkem768'
 #
 # Experiment dimensions:
 # - protocol: raw, http1
 # - mode: x25519, x25519mlkem768
-# - payload: 1 KiB, 10 KiB, 100 KiB, 1 MiB
+# - payload: 1024, 10240, 102400, 1048576 bytes
 # - concurrency: 1, 10, 100
 # - iterations: 200 measured, 20 warmup
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -23,6 +24,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -32,6 +34,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -41,6 +44,7 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -50,6 +54,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -59,6 +64,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -68,6 +74,7 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -77,6 +84,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -86,6 +94,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -95,6 +104,7 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -104,6 +114,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -113,6 +124,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
@@ -122,114 +134,7 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 1024
-iters = 200
-warmup = 20
-concurrency = 1
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 1024
-iters = 200
-warmup = 20
-concurrency = 10
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 1024
-iters = 200
-warmup = 20
-concurrency = 100
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 10240
-iters = 200
-warmup = 20
-concurrency = 1
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 10240
-iters = 200
-warmup = 20
-concurrency = 10
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 10240
-iters = 200
-warmup = 20
-concurrency = 100
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 102400
-iters = 200
-warmup = 20
-concurrency = 1
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 102400
-iters = 200
-warmup = 20
-concurrency = 10
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 102400
-iters = 200
-warmup = 20
-concurrency = 100
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 1048576
-iters = 200
-warmup = 20
-concurrency = 1
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 1048576
-iters = 200
-warmup = 20
-concurrency = 10
-
-[[benchmarks]]
-server = "127.0.0.1:4435"
-proto = "raw"
-mode = "x25519mlkem768"
-payload = 1048576
-iters = 200
-warmup = 20
-concurrency = 100
-
-[[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -239,6 +144,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -248,6 +154,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -257,6 +164,7 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -266,6 +174,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -275,6 +184,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -284,6 +194,7 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -293,6 +204,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -302,6 +214,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -311,6 +224,7 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -320,6 +234,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -329,6 +244,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
@@ -338,6 +254,127 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 1024
+iters = 200
+warmup = 20
+concurrency = 1
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 1024
+iters = 200
+warmup = 20
+concurrency = 10
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 1024
+iters = 200
+warmup = 20
+concurrency = 100
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 10240
+iters = 200
+warmup = 20
+concurrency = 1
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 10240
+iters = 200
+warmup = 20
+concurrency = 10
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 10240
+iters = 200
+warmup = 20
+concurrency = 100
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 102400
+iters = 200
+warmup = 20
+concurrency = 1
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 102400
+iters = 200
+warmup = 20
+concurrency = 10
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 102400
+iters = 200
+warmup = 20
+concurrency = 100
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 1048576
+iters = 200
+warmup = 20
+concurrency = 1
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 1048576
+iters = 200
+warmup = 20
+concurrency = 10
+
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4435"
+proto = "raw"
+mode = "x25519mlkem768"
+payload = 1048576
+iters = 200
+warmup = 20
+concurrency = 100
+
+[[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -347,6 +384,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -356,6 +394,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -365,6 +404,7 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -374,6 +414,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -383,6 +424,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -392,6 +434,7 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -401,6 +444,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -410,6 +454,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -419,6 +464,7 @@ warmup = 20
 concurrency = 100
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -428,6 +474,7 @@ warmup = 20
 concurrency = 1
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
@@ -437,6 +484,7 @@ warmup = 20
 concurrency = 10
 
 [[benchmarks]]
+verification.kind = "insecure"
 server = "127.0.0.1:4436"
 proto = "http1"
 mode = "x25519mlkem768"
