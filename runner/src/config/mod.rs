@@ -10,6 +10,10 @@ use miette::{NamedSource, SourceSpan};
 use serde::Deserialize;
 use std::{fs::read_to_string, net::SocketAddr, path::Path};
 
+const fn default_timeout_secs() -> u64 {
+    300
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct BenchmarkConfig {
     pub proto: ProtocolMode,
@@ -19,6 +23,8 @@ pub struct BenchmarkConfig {
     pub iters: u32,
     pub warmup: u32,
     pub concurrency: u32,
+    #[serde(default = "default_timeout_secs")]
+    pub timeout_secs: u64,
     pub server: SocketAddr,
 }
 
@@ -77,6 +83,7 @@ impl TryFrom<Args> for Config {
                 iters: args.iters,
                 warmup: args.warmup,
                 concurrency: args.concurrency,
+                timeout_secs: args.timeout_secs,
                 server: args
                     .server
                     .ok_or_else(|| common::Error::config("--server is required"))?,
@@ -110,6 +117,7 @@ payload = 4096
 iters = 50
 warmup = 5
 concurrency = 4
+timeout_secs = 120
 server = "127.0.0.1:4433"
 "#;
 
@@ -134,6 +142,7 @@ server = "127.0.0.1:4433"
         assert_eq!(config.benchmarks.len(), 1);
         assert_eq!(config.benchmarks[0].mode, KeyExchangeMode::X25519);
         assert_eq!(config.benchmarks[0].payload, 1024);
+        assert_eq!(config.benchmarks[0].timeout_secs, 300);
     }
 
     #[test]
@@ -148,6 +157,8 @@ server = "127.0.0.1:4433"
         assert_eq!(bench_0.verification, VerificationMode::Insecure);
         assert_eq!(bench_1.mode, KeyExchangeMode::X25519Mlkem768);
         assert_eq!(bench_1.proto, ProtocolMode::Http1);
+        assert_eq!(bench_0.timeout_secs, 300);
+        assert_eq!(bench_1.timeout_secs, 120);
         assert_eq!(
             bench_1.verification,
             VerificationMode::CaCert {
@@ -227,6 +238,7 @@ server = "127.0.0.1:4433"
             iters: 100,
             warmup: 10,
             concurrency: 1,
+            timeout_secs: 300,
             out: None,
             config: None,
             ca_cert: None,
@@ -248,6 +260,7 @@ server = "127.0.0.1:4433"
             iters: 100,
             warmup: 10,
             concurrency: 1,
+            timeout_secs: 300,
             out: None,
             config: None,
             ca_cert: Some(PathBuf::from("certs/ca.der")),

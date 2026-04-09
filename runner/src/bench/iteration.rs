@@ -17,8 +17,6 @@ use tokio_rustls::TlsConnector;
 use tracing::debug;
 use uuid::Uuid;
 
-const ITERATION_TIMEOUT_SECS: u64 = 30;
-
 /// Result of a single benchmark iteration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IterationResult {
@@ -43,7 +41,7 @@ pub async fn run_single_iteration(
         "iteration started"
     );
     let result = tokio::time::timeout(
-        Duration::from_secs(ITERATION_TIMEOUT_SECS),
+        Duration::from_secs(config.timeout_secs),
         run_iteration(
             config.server,
             config.proto,
@@ -56,7 +54,8 @@ pub async fn run_single_iteration(
     .await
     .map_err(|_| {
         common::Error::protocol(format!(
-            "iteration {iteration} timed out after {ITERATION_TIMEOUT_SECS}s"
+            "iteration {iteration} timed out after {}s",
+            config.timeout_secs
         ))
     })??;
 

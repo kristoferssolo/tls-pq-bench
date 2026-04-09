@@ -33,6 +33,7 @@ fn validate_benchmark(
     validate_positive_field(src.clone(), content, idx, "payload", benchmark.payload)?;
     validate_positive_field(src.clone(), content, idx, "iters", benchmark.iters)?;
     validate_positive_field(src, content, idx, "concurrency", benchmark.concurrency)?;
+    validate_positive_u64_field(content, path, idx, "timeout_secs", benchmark.timeout_secs)?;
 
     Ok(())
 }
@@ -47,6 +48,26 @@ fn validate_positive_field(
     if value == 0 {
         return Err(ConfigError::ValidationError {
             src,
+            span: find_field_span(content, idx, field_name),
+            field: field_name.into(),
+            idx,
+            message: "Must be greater than 0".into(),
+        }
+        .into());
+    }
+    Ok(())
+}
+
+fn validate_positive_u64_field(
+    content: &str,
+    path: &Path,
+    idx: usize,
+    field_name: &str,
+    value: u64,
+) -> error::Result<()> {
+    if value == 0 {
+        return Err(ConfigError::ValidationError {
+            src: NamedSource::new(path.display().to_string(), content.to_string()),
             span: find_field_span(content, idx, field_name),
             field: field_name.into(),
             idx,
