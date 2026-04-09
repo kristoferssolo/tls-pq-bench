@@ -5,6 +5,7 @@
 # ///
 """Summarize benchmark JSONL results with percentile statistics."""
 
+import csv
 import json
 import math
 import sys
@@ -18,6 +19,7 @@ from typing import Any, Iterator, NamedTuple
 DEFAULT_GROUP_BY = ["proto", "mode", "payload_bytes", "concurrency"]
 DEFAULT_METRICS = ["tcp", "handshake", "ttlb"]
 UNIT_SCALE = {"ns": 1.0, "us": 1_000.0, "ms": 1_000_000.0}
+STAT_COLUMNS = ["metric", "n", "unit", "mean"]
 
 
 class Unit(StrEnum):
@@ -36,6 +38,7 @@ class Unit(StrEnum):
 class OutputFormat(StrEnum):
     MARKDOWN = auto()
     JSON = auto()
+    CSV = auto()
 
     def __str__(self) -> str:
         return self.value
@@ -48,12 +51,12 @@ class PercentileSpec(NamedTuple):
 
 PERCENTILES = [
     PercentileSpec("p50", 0.50),
-    PercentileSpec("p90", 0.90),
+    PercentileSpec("p95", 0.95),
     PercentileSpec("p99", 0.99),
 ]
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class SummaryRow:
     group_fields: dict[str, Any]
     metric: str
@@ -61,7 +64,7 @@ class SummaryRow:
     unit: Unit
     mean: float
     p50: float
-    p90: float
+    p95: float
     p99: float
 
     def to_flat_dict(self) -> dict[str, Any]:
@@ -101,6 +104,7 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "-u",
         "--unit",
+        type=Unit,
         choices=list(Unit),
         default=Unit.MS,
         metavar=f"{{{','.join(str(u) for u in Unit)}}}",
@@ -109,6 +113,7 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "-f",
         "--format",
+        type=OutputFormat,
         choices=list(OutputFormat),
         default=OutputFormat.MARKDOWN,
         metavar=f"{{{','.join(str(f) for f in OutputFormat)}}}",
@@ -127,7 +132,7 @@ def _iter_lines(path_str: str) -> Iterator[tuple[str, int, str]]:
 
 
 def load_records(paths: list[str]) -> list[dict[str, Any]]:
-    records = []
+    records: list[dict[str, Any]] = []
     for path_str in paths:
         for source, line_number, line in _iter_lines(path_str):
             stripped = line.strip()
@@ -141,7 +146,7 @@ def load_records(paths: list[str]) -> list[dict[str, Any]]:
                 ) from e
             if not isinstance(record, dict):
                 raise SystemExit(
-                    f"{source}:{line_number}: expected object rrecord, got {type(record).__name__}"
+                    f"{source}:{line_number}: expected object record, got {type(record).__name__}"
                 )
             records.append(record)
 
@@ -154,7 +159,7 @@ def group_records(
     records: list[dict[str, Any]],
     group_by: list[str],
 ) -> dict[tuple[Any, ...], list[dict[str, Any]]]:
-    grouped = {}
+    grouped: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
     for record in records:
         missing = [field for field in group_by if field not in record]
         if missing:
@@ -184,7 +189,7 @@ def _extract_metric_values(
     records: list[dict[str, Any]],
     metric: str,
 ) -> list[float]:
-    values = []
+    values: list[float] = []
     for record in records:
         value = record.get(metric)
         if value is None:
@@ -203,7 +208,7 @@ def summarize(
     metrics: list[str],
     unit: Unit,
 ) -> list[SummaryRow]:
-    rows = []
+    rows: list[SummaryRow] = []
 
     for group_key in sorted(grouped):
         records = grouped[group_key]
@@ -224,7 +229,7 @@ def summarize(
                     unit=unit,
                     mean=fmean(scaled),
                     p50=percentile_values["p50"],
-                    p90=percentile_values["p90"],
+                    p95=percentile_values["p95"],
                     p99=percentile_values["p99"],
                 )
             )
@@ -238,9 +243,12 @@ def format_cell(value: Any) -> str:
     return str(value).replace("|", "\\|")
 
 
+def output_columns(group_by: list[str]) -> list[str]:
+    return [*group_by, *STAT_COLUMNS, *(spec.label for spec in PERCENTILES)]
+
+
 def render_markdown(rows: list[SummaryRow], group_by: list[str]) -> str:
-    stat_columns = ["metric", "n", "unit", "mean"] + [s.label for s in PERCENTILES]
-    columns = [*group_by, *stat_columns]
+    columns = output_columns(group_by)
     lines = [
         "| " + " | ".join(columns) + " |",
         "| " + " | ".join("---" for _ in columns) + " |",
@@ -254,15 +262,27 @@ def render_markdown(rows: list[SummaryRow], group_by: list[str]) -> str:
     return "\n".join(lines)
 
 
+def write_csv(rows: list[SummaryRow], group_by: list[str]) -> None:
+    columns = output_columns(group_by)
+    writer = csv.DictWriter(sys.stdout, fieldnames=columns)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row.to_flat_dict())
+
+
 def main() -> None:
     args = parse_args()
     records = load_records(args.input)
     grouped = group_records(records, args.group_by)
     rows = summarize(grouped, args.group_by, args.metrics, args.unit)
 
-    if args.format == "json":
+    if args.format == OutputFormat.JSON:
         json.dump([row.to_flat_dict() for row in rows], sys.stdout, indent=2)
         print()
+        return
+
+    if args.format == OutputFormat.CSV:
+        write_csv(rows, args.group_by)
         return
 
     print(render_markdown(rows, args.group_by))
