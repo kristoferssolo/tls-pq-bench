@@ -115,6 +115,98 @@ multi-server cert="" key="": build
 
     wait
 
+# Start the full production listener set on one server host. This covers all four key exchange variants, each exposed over raw and http1: 4433/4434 x25519, 4435/4436 secp256r1, 4437/4438 x25519mlkem768, 4439/4440 secp256r1mlkem768.
+[group("prod")]
+prod-server bind_host="0.0.0.0" cert="certs/server.der" key="certs/server.key": build
+    #!/usr/bin/env bash
+    just _setup
+    pids=()
+    names=()
+
+    if [[ "{{ cert }}" == "" || "{{ key }}" == "" ]]; then
+        echo "prod-server requires both cert and key" >&2
+        exit 1
+    fi
+    if [[ ! -f "{{ cert }}" ]]; then
+        echo "certificate file not found: {{ cert }}" >&2
+        exit 1
+    fi
+    if [[ ! -f "{{ key }}" ]]; then
+        echo "private key file not found: {{ key }}" >&2
+        exit 1
+    fi
+
+    cleanup() {
+        for pid in "${pids[@]}"; do
+            kill "$pid" 2>/dev/null || true
+        done
+        wait || true
+    }
+
+    trap cleanup EXIT INT TERM
+
+    echo "Starting production benchmark servers on {{ bind_host }}:"
+    echo "    x25519 raw              -> {{ bind_host }}:4433"
+    echo "    x25519 http1            -> {{ bind_host }}:4434"
+    echo "    secp256r1 raw           -> {{ bind_host }}:4435"
+    echo "    secp256r1 http1         -> {{ bind_host }}:4436"
+    echo "    x25519mlkem768 raw      -> {{ bind_host }}:4437"
+    echo "    x25519mlkem768 http1    -> {{ bind_host }}:4438"
+    echo "    secp256r1mlkem768 raw   -> {{ bind_host }}:4439"
+    echo "    secp256r1mlkem768 http1 -> {{ bind_host }}:4440"
+
+    LOG_FORMAT=compact {{ server }} --mode x25519            --proto raw   --listen {{ bind_host }}:4433 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-x25519-raw.log 2>&1              & pids+=($!); names+=("x25519 raw")
+    LOG_FORMAT=compact {{ server }} --mode x25519            --proto http1 --listen {{ bind_host }}:4434 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-x25519-http1.log 2>&1            & pids+=($!); names+=("x25519 http1")
+    LOG_FORMAT=compact {{ server }} --mode secp256r1         --proto raw   --listen {{ bind_host }}:4435 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-secp256r1-raw.log 2>&1           & pids+=($!); names+=("secp256r1 raw")
+    LOG_FORMAT=compact {{ server }} --mode secp256r1         --proto http1 --listen {{ bind_host }}:4436 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-secp256r1-http1.log 2>&1         & pids+=($!); names+=("secp256r1 http1")
+    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768    --proto raw   --listen {{ bind_host }}:4437 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-x25519mlkem768-raw.log 2>&1      & pids+=($!); names+=("x25519mlkem768 raw")
+    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768    --proto http1 --listen {{ bind_host }}:4438 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-x25519mlkem768-http1.log 2>&1    & pids+=($!); names+=("x25519mlkem768 http1")
+    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto raw   --listen {{ bind_host }}:4439 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-secp256r1mlkem768-raw.log 2>&1   & pids+=($!); names+=("secp256r1mlkem768 raw")
+    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto http1 --listen {{ bind_host }}:4440 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-secp256r1mlkem768-http1.log 2>&1 & pids+=($!); names+=("secp256r1mlkem768 http1")
+
+    sleep 1
+
+    for idx in "${!pids[@]}"; do
+        if ! kill -0 "${pids[$idx]}" 2>/dev/null; then
+            echo "server exited during startup: ${names[$idx]}" >&2
+            wait "${pids[$idx]}" || true
+            case "${names[$idx]}" in
+                "x25519 raw") log="{{ logs_dir }}/prod-server-x25519-raw.log" ;;
+                "x25519 http1") log="{{ logs_dir }}/prod-server-x25519-http1.log" ;;
+                "secp256r1 raw") log="{{ logs_dir }}/prod-server-secp256r1-raw.log" ;;
+                "secp256r1 http1") log="{{ logs_dir }}/prod-server-secp256r1-http1.log" ;;
+                "x25519mlkem768 raw") log="{{ logs_dir }}/prod-server-x25519mlkem768-raw.log" ;;
+                "x25519mlkem768 http1") log="{{ logs_dir }}/prod-server-x25519mlkem768-http1.log" ;;
+                "secp256r1mlkem768 raw") log="{{ logs_dir }}/prod-server-secp256r1mlkem768-raw.log" ;;
+                "secp256r1mlkem768 http1") log="{{ logs_dir }}/prod-server-secp256r1mlkem768-http1.log" ;;
+            esac
+            echo "--- ${log} ---" >&2
+            cat "${log}" >&2 || true
+            exit 1
+        fi
+    done
+
+    wait
+
+# Generate the scheduled remote benchmark configs and install/enable the systemd timers on the runner box. Expects an env file compatible with ops/scheduled-benchmarks.env.example.
+[group("prod")]
+prod-schedule env_file="/etc/tls-pq-bench/scheduled.env": build
+    #!/usr/bin/env bash
+    if [[ ! -f "{{ env_file }}" ]]; then
+        echo "schedule env file not found: {{ env_file }}" >&2
+        exit 1
+    fi
+
+    SCHEDULE_ENV_FILE="{{ env_file }}" ./scripts/generate_remote_schedule_configs.sh
+    sudo install -m 0644 ops/systemd/tls-pq-bench-track.service /etc/systemd/system/tls-pq-bench-track.service
+    sudo install -m 0644 ops/systemd/tls-pq-bench-track.timer /etc/systemd/system/tls-pq-bench-track.timer
+    sudo install -m 0644 ops/systemd/tls-pq-bench-full.service /etc/systemd/system/tls-pq-bench-full.service
+    sudo install -m 0644 ops/systemd/tls-pq-bench-full.timer /etc/systemd/system/tls-pq-bench-full.timer
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now tls-pq-bench-track.timer
+    sudo systemctl enable --now tls-pq-bench-full.timer
+
+
 # Run a parameterized benchmark against a live server
 [group("run")]
 runner server_addr="127.0.0.1:4433" proto="raw" mode="x25519" payload="1024" iters="200" warmup="20" concurrency="1": build
