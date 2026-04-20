@@ -1,11 +1,15 @@
 use miette::{Context, IntoDiagnostic};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-pub async fn run_http1_exchange<S>(tls_stream: &mut S, payload_bytes: u32) -> miette::Result<()>
+pub async fn run_http1_exchange<S>(
+    tls_stream: &mut S,
+    payload_bytes: u32,
+    host_header: &str,
+) -> miette::Result<()>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
-    let request = build_http1_request(payload_bytes);
+    let request = build_http1_request(payload_bytes, host_header);
 
     tls_stream
         .write_all(&request)
@@ -65,9 +69,11 @@ where
     Ok(())
 }
 
-fn build_http1_request(payload_bytes: u32) -> Vec<u8> {
-    format!("GET /bytes/{payload_bytes} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
-        .into_bytes()
+fn build_http1_request(payload_bytes: u32, host_header: &str) -> Vec<u8> {
+    format!(
+        "GET /bytes/{payload_bytes} HTTP/1.1\r\nHost: {host_header}\r\nConnection: close\r\n\r\n"
+    )
+    .into_bytes()
 }
 
 fn parse_content_length(headers: &str) -> miette::Result<usize> {
@@ -117,11 +123,11 @@ mod tests {
 
     #[test]
     fn build_http1_request_formats_get_requests() {
-        let request = build_http1_request(16);
+        let request = build_http1_request(16, "bench.example.com");
         let request_string = String::from_utf8(request).expect("valid string");
         assert_eq!(
             request_string,
-            "GET /bytes/16 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+            "GET /bytes/16 HTTP/1.1\r\nHost: bench.example.com\r\nConnection: close\r\n\r\n"
         );
     }
 
@@ -190,7 +196,7 @@ mod tests {
 
             let request = str::from_utf8(&req[..n]).expect("utf8 request");
             assert!(request.starts_with("GET /bytes/16 HTTP/1.1\r\n"));
-            assert!(request.contains("Host: localhost\r\n"));
+            assert!(request.contains("Host: bench.example.com\r\n"));
             assert!(request.contains("Connection: close\r\n"));
 
             server
@@ -199,7 +205,7 @@ mod tests {
                 .expect("write response");
         });
 
-        assert_ok!(run_http1_exchange(&mut client, 16).await);
+        assert_ok!(run_http1_exchange(&mut client, 16, "bench.example.com").await);
         assert_ok!(server_task.await);
     }
 
@@ -217,7 +223,7 @@ mod tests {
                 .expect("write response");
         });
 
-        assert_ok!(run_http1_exchange(&mut client, 4).await);
+        assert_ok!(run_http1_exchange(&mut client, 4, "bench.example.com").await);
         assert_ok!(server_task.await);
     }
 
@@ -235,7 +241,7 @@ mod tests {
                 .expect("write response");
         });
 
-        assert_err!(run_http1_exchange(&mut client, 4).await);
+        assert_err!(run_http1_exchange(&mut client, 4, "bench.example.com").await);
         assert_ok!(server_task.await);
     }
 
@@ -258,7 +264,7 @@ mod tests {
                 .expect("write remaining body");
         });
 
-        assert_ok!(run_http1_exchange(&mut client, 8).await);
+        assert_ok!(run_http1_exchange(&mut client, 8, "bench.example.com").await);
         assert_ok!(server_task.await);
     }
 }

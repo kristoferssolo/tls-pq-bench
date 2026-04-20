@@ -18,6 +18,10 @@ pub struct Args {
     #[arg(long, required_unless_present = "config")]
     pub server: Option<SocketAddr>,
 
+    /// TLS server name and HTTP Host header to use for the connection
+    #[arg(long, default_value = "localhost")]
+    pub server_name: String,
+
     /// Payload size in bytes to request from server
     #[arg(long, default_value = "1024")]
     pub payload_bytes: u32,

@@ -61,6 +61,7 @@ pub async fn run_single_iteration(
             config.payload,
             &tls_connector,
             &server_name,
+            &config.server_name,
             iteration,
         ),
     )
@@ -86,6 +87,7 @@ pub async fn run_iteration(
     payload_bytes: u32,
     tls_connector: &TlsConnector,
     server_name: &ServerName<'static>,
+    host_header: &str,
     iteration: u32,
 ) -> miette::Result<IterationResult> {
     let tcp_start = Instant::now();
@@ -113,7 +115,7 @@ pub async fn run_iteration(
 
     let ttlb_start = Instant::now();
     debug!(iteration, "protocol exchange started");
-    run_exchange(&mut tls_stream, proto, payload_bytes).await?;
+    run_exchange(&mut tls_stream, proto, payload_bytes, host_header).await?;
 
     let ttlb_ns = tcp_ns + handshake_ns + ttlb_start.elapsed().as_nanos();
     debug!(iteration, ttlb_ns, "protocol exchange complete");
@@ -129,13 +131,14 @@ async fn run_exchange<S>(
     tls_stream: &mut S,
     proto: ProtocolMode,
     payload_bytes: u32,
+    host_header: &str,
 ) -> miette::Result<()>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
     match proto {
         ProtocolMode::Raw => run_raw_exchange(tls_stream, payload_bytes).await,
-        ProtocolMode::Http1 => run_http1_exchange(tls_stream, payload_bytes).await,
+        ProtocolMode::Http1 => run_http1_exchange(tls_stream, payload_bytes, host_header).await,
     }
 }
 

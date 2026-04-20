@@ -53,12 +53,10 @@ async fn main() -> miette::Result<()> {
         args.try_into()?
     };
 
-    let server_name = ServerName::try_from("localhost".to_string())
-        .into_diagnostic()
-        .context("invalid server name")?;
-
     for benchmark in &config.benchmarks {
         info!(
+            server = %benchmark.server,
+            server_name = %benchmark.server_name,
             proto = %benchmark.proto,
             mode = %benchmark.mode,
             payload = benchmark.payload,
@@ -70,13 +68,17 @@ async fn main() -> miette::Result<()> {
 
         let tls_config = build_tls_config(benchmark.mode, &benchmark.verification)?;
         let tls_connector = TlsConnector::from(Arc::new(tls_config));
+        let server_name = ServerName::try_from(benchmark.server_name.clone())
+            .into_diagnostic()
+            .with_context(|| format!("invalid server name {}", benchmark.server_name))?;
 
         run_benchmark(run_id, benchmark, &tls_connector, &server_name, &mut output)
             .await
             .with_context(|| {
                 format!(
-                    "benchmark failed: server={} proto={} mode={} payload={} concurrency={} iters={} warmup={} timeout_secs={}",
+                    "benchmark failed: server={} server_name={} proto={} mode={} payload={} concurrency={} iters={} warmup={} timeout_secs={}",
                     benchmark.server,
+                    benchmark.server_name,
                     benchmark.proto,
                     benchmark.mode,
                     benchmark.payload,

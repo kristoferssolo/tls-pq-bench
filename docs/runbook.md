@@ -23,6 +23,7 @@ Raw example:
     --server 1.2.3.4:4433 \
     --proto raw \
     --mode x25519 \
+    --server-name bench.example.com \
     --payload-bytes 1024 \
     --concurrency 10 \
     --iters 500 \
@@ -121,12 +122,13 @@ For matrix benchmarks, every entry must include a `verification` block. Use:
 
 ```toml
 verification = { kind = "cacert", path = "certs/ca.der" }
+server_name = "bench.example.com"
 ```
 
-The runner currently always uses TLS server name `localhost`, regardless of the
-socket address passed via `--server`. For two-machine experiments, the server
-certificate must therefore still be valid for `localhost`, and the runner host
-must have a copy of the matching `certs/ca.der`.
+If omitted, `server_name` defaults to `localhost`. For two-machine experiments,
+set it to the DNS name or IP address covered by the server certificate. The
+runner uses that value for both TLS verification and the HTTP/1.1 `Host`
+header, and the runner host still needs a copy of the matching `certs/ca.der`.
 
 ## 4) Collect perf stats (optional)
 

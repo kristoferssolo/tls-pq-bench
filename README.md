@@ -125,6 +125,7 @@ Run the client with CA verification enabled:
     --server 127.0.0.1:4433 \
     --proto raw \
     --mode x25519 \
+    --server-name localhost \
     --ca-cert certs/ca.der \
     --iters 100 \
     --warmup 10
@@ -136,10 +137,11 @@ For matrix runs, switch each benchmark entry to:
 verification = { kind = "cacert", path = "certs/ca.der" }
 ```
 
-The runner currently always uses TLS server name `localhost`, even if `--server`
-points to another IP or hostname. For remote runs, the presented certificate
-must still be valid for `localhost`, and the runner machine needs a copy of the
-matching CA file.
+The runner now defaults to `server_name = "localhost"` for local runs. Override
+it with `--server-name <hostname>` on the CLI, or `server_name = "<hostname>"`
+per benchmark in TOML, when the server presents a certificate for a remote DNS
+name. The same value is used for TLS verification and the HTTP/1.1 `Host`
+header.
 
 ### Output
 

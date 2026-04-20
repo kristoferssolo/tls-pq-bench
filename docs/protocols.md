@@ -37,7 +37,7 @@ Server replies:
 
 Notes:
 
-- the current client always sends `Host: localhost`
+- the client sends `Host: <server_name>`, which defaults to `localhost`
 - the current implementation does not support `GET /?n=N`
 
 Properties:

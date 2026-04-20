@@ -14,6 +14,10 @@ const fn default_timeout_secs() -> u64 {
     30
 }
 
+fn default_server_name() -> String {
+    "localhost".into()
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct BenchmarkConfig {
     pub proto: ProtocolMode,
@@ -26,6 +30,8 @@ pub struct BenchmarkConfig {
     #[serde(default = "default_timeout_secs")]
     pub timeout_secs: u64,
     pub server: SocketAddr,
+    #[serde(default = "default_server_name")]
+    pub server_name: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -87,6 +93,7 @@ impl TryFrom<Args> for Config {
                 server: args
                     .server
                     .ok_or_else(|| common::Error::config("--server is required"))?,
+                server_name: args.server_name,
             }],
         })
     }
@@ -119,6 +126,7 @@ warmup = 5
 concurrency = 4
 timeout_secs = 120
 server = "127.0.0.1:4433"
+server_name = "bench.example.com"
 "#;
 
     fn get_config_from_str(toml: &str) -> Config {
@@ -143,6 +151,7 @@ server = "127.0.0.1:4433"
         assert_eq!(config.benchmarks[0].mode, KeyExchangeMode::X25519);
         assert_eq!(config.benchmarks[0].payload, 1024);
         assert_eq!(config.benchmarks[0].timeout_secs, 30);
+        assert_eq!(config.benchmarks[0].server_name, "localhost");
     }
 
     #[test]
@@ -155,10 +164,12 @@ server = "127.0.0.1:4433"
         assert_eq!(bench_0.mode, KeyExchangeMode::X25519);
         assert_eq!(bench_0.proto, ProtocolMode::Raw);
         assert_eq!(bench_0.verification, VerificationMode::Insecure);
+        assert_eq!(bench_0.server_name, "localhost");
         assert_eq!(bench_1.mode, KeyExchangeMode::X25519Mlkem768);
         assert_eq!(bench_1.proto, ProtocolMode::Http1);
         assert_eq!(bench_0.timeout_secs, 30);
         assert_eq!(bench_1.timeout_secs, 120);
+        assert_eq!(bench_1.server_name, "bench.example.com");
         assert_eq!(
             bench_1.verification,
             VerificationMode::CaCert {
@@ -242,12 +253,14 @@ server = "127.0.0.1:4433"
             out: None,
             config: None,
             ca_cert: None,
+            server_name: "localhost".to_string(),
         }));
 
         assert_eq!(
             config.benchmarks[0].verification,
             VerificationMode::Insecure
         );
+        assert_eq!(config.benchmarks[0].server_name, "localhost");
     }
 
     #[test]
@@ -264,6 +277,7 @@ server = "127.0.0.1:4433"
             out: None,
             config: None,
             ca_cert: Some(PathBuf::from("certs/ca.der")),
+            server_name: "bench.example.com".to_string(),
         }));
 
         assert_eq!(
@@ -272,6 +286,7 @@ server = "127.0.0.1:4433"
                 path: PathBuf::from("certs/ca.der"),
             }
         );
+        assert_eq!(config.benchmarks[0].server_name, "bench.example.com");
     }
 
     #[test]

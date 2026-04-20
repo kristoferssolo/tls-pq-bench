@@ -15,6 +15,7 @@ use uuid::Uuid;
     fields(
         run_id = %run_id,
         server = %config.server,
+        server_name = %config.server_name,
         proto = %config.proto,
         mode = %config.mode,
         payload = config.payload,
@@ -55,6 +56,7 @@ pub async fn run_benchmark<W: Write + Send>(
             config.payload,
             tls_connector,
             server_name,
+            &config.server_name,
             i,
         )
         .await?;
@@ -76,6 +78,7 @@ pub async fn run_benchmark<W: Write + Send>(
     fields(
         run_id = %run_id,
         server = %config.server,
+        server_name = %config.server_name,
         proto = %config.proto,
         mode = %config.mode,
         payload = config.payload,
