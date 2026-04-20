@@ -34,11 +34,15 @@ Operationally:
 
 ## What to record per run
 
+- run identifier (`run_id`)
+- protocol mode (`proto`)
 - key exchange mode: `x25519` | `x25519mlkem768`
 - payload size (bytes)
 - concurrency level
 - number of iterations
 - warmup iterations
+- iteration index (`iteration`)
+- timing metrics in nanoseconds: `tcp_ns`, `handshake_ns`, `ttlb_ns`
 - CPU pinning info (if used)
 - system info (kernel, CPU, governor)
 - network profile (baseline / netem parameters)
@@ -51,11 +55,23 @@ Example record:
 
 ```json
 {
+    "run_id": "0195f8cf-2f6f-7e9b-9c52-6e5d6b7d0a10",
+    "iteration": 42,
+    "proto": "raw",
     "mode": "x25519",
     "payload_bytes": 1024,
     "concurrency": 1,
-    "iter": 42,
-    "handshake_ms": 8.3,
-    "ttlb_ms": 12.1
+    "iters": 500,
+    "warmup": 50,
+    "tcp_ns": 120000,
+    "handshake_ns": 8300000,
+    "ttlb_ns": 12100000
 }
 ```
+
+The JSONL schema uses nanoseconds in source data. Convert to milliseconds only
+when rendering summaries or plots.
+
+The bundled `scripts/analyze_results.py` tool groups records by `proto`, `mode`,
+`payload_bytes`, and `concurrency` by default, and summarizes metrics named
+`tcp`, `handshake`, and `ttlb` by reading the corresponding `*_ns` fields.

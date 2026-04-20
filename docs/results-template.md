@@ -33,5 +33,8 @@
 Example record:
 
 ```jsonl
-{"iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"tcp_ns":120000,"handshake_ns":500000,"ttlb_ns":650000}
+{"run_id":"0195f8cf-2f6f-7e9b-9c52-6e5d6b7d0a10","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":500,"warmup":50,"tcp_ns":120000,"handshake_ns":500000,"ttlb_ns":650000}
 ```
+
+The bundled analyzer expects nanosecond metric fields (`tcp_ns`,
+`handshake_ns`, `ttlb_ns`) and can render summaries in `ns`, `us`, or `ms`.

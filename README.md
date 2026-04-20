@@ -145,9 +145,13 @@ matching CA file.
 Results are emitted as JSONL to stdout or a file:
 
 ```jsonl
-{"iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"tcp_ns":120000,"handshake_ns":500000,"ttlb_ns":650000}
-{"iteration":1,"proto":"http1","mode":"x25519mlkem768","payload_bytes":1024,"tcp_ns":130000,"handshake_ns":560000,"ttlb_ns":760000}
+{"run_id":"0195f8cf-2f6f-7e9b-9c52-6e5d6b7d0a10","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":100,"warmup":10,"tcp_ns":120000,"handshake_ns":500000,"ttlb_ns":650000}
+{"run_id":"0195f8cf-2f6f-7e9b-9c52-6e5d6b7d0a10","iteration":1,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":100,"warmup":10,"tcp_ns":130000,"handshake_ns":560000,"ttlb_ns":760000}
 ```
+
+The raw records always store timing metrics in nanoseconds (`tcp_ns`,
+`handshake_ns`, `ttlb_ns`). The bundled analyzer summarizes those fields and
+can convert them to `us` or `ms` for presentation.
 
 ### Logging
 
