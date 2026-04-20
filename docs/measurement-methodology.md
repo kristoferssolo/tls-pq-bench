@@ -36,7 +36,9 @@ Operationally:
 
 - run identifier (`run_id`)
 - protocol mode (`proto`)
-- key exchange mode: `x25519` | `x25519mlkem768`
+- key exchange mode:
+  - primary pair: `x25519` | `x25519mlkem768`
+  - secondary pair: `secp256r1` | `secp256r1mlkem768`
 - payload size (bytes)
 - concurrency level
 - number of iterations

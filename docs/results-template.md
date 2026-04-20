@@ -1,5 +1,8 @@
 # Results template
 
+Use the X25519 family as the primary comparison if needed, but keep space for
+the implemented secp256r1 family as a secondary comparison.
+
 ## Summary (per protocol and mode)
 
 - Environment:
@@ -13,19 +16,27 @@
 
  | Protocol | Mode | Concurrency | p50 | p95 | p99 | mean |
  |----------|------|-------------|-----|-----|-----|------|
- | raw | X25519 | 1 |  |  |  |  |
- | raw | X25519MLKEM768 | 1 |  |  |  |  |
- | http1 | X25519 | 1 |  |  |  |  |
- | http1 | X25519MLKEM768 | 1 |  |  |  |  |
+ | raw | x25519 | 1 |  |  |  |  |
+ | raw | secp256r1 | 1 |  |  |  |  |
+ | raw | x25519mlkem768 | 1 |  |  |  |  |
+ | raw | secp256r1mlkem768 | 1 |  |  |  |  |
+ | http1 | x25519 | 1 |  |  |  |  |
+ | http1 | secp256r1 | 1 |  |  |  |  |
+ | http1 | x25519mlkem768 | 1 |  |  |  |  |
+ | http1 | secp256r1mlkem768 | 1 |  |  |  |  |
 
 ## TTLB (ms) by payload
 
  | Payload | Protocol | Mode | Concurrency | p50 | p95 | p99 |
  |---------|----------|------|-------------|-----|-----|-----|
- | 1 KB | raw | X25519 | 1 |  |  |  |
- | 1 KB | raw | X25519MLKEM768 | 1 |  |  |  |
- | 1 KB | http1 | X25519 | 1 |  |  |  |
- | 1 KB | http1 | X25519MLKEM768 | 1 |  |  |  |
+ | 1 KB | raw | x25519 | 1 |  |  |  |
+ | 1 KB | raw | secp256r1 | 1 |  |  |  |
+ | 1 KB | raw | x25519mlkem768 | 1 |  |  |  |
+ | 1 KB | raw | secp256r1mlkem768 | 1 |  |  |  |
+ | 1 KB | http1 | x25519 | 1 |  |  |  |
+ | 1 KB | http1 | secp256r1 | 1 |  |  |  |
+ | 1 KB | http1 | x25519mlkem768 | 1 |  |  |  |
+ | 1 KB | http1 | secp256r1mlkem768 | 1 |  |  |  |
  ...
 
 ## JSONL schema reminder

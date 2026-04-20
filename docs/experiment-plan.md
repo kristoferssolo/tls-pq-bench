@@ -1,10 +1,17 @@
 # Experiment plan
 
+Current implementation note: the harness supports four key exchange groups:
+`x25519`, `secp256r1`, `x25519mlkem768`, and `secp256r1mlkem768`. If the thesis
+write-up wants a simpler narrative, treat the X25519 family as the primary
+comparison and the secp256r1 family as a secondary validation set.
+
 ## Independent variables
 
 1. Key exchange group:
-   - X25519 (baseline)
-   - X25519MLKEM768 (hybrid PQ)
+   - `x25519` (primary classical baseline)
+   - `x25519mlkem768` (primary hybrid PQ comparison)
+   - `secp256r1` (secondary classical baseline)
+   - `secp256r1mlkem768` (secondary hybrid PQ comparison)
 2. Payload size:
    - 1 KB, 10 KB, 100 KB, 1 MB
 3. Concurrency:
@@ -34,7 +41,8 @@
 
 Start small to validate correctness:
 
-- (mode: 2) × (payload: 4) × (concurrency: 2) = 16 cells
+- primary scope: (mode: 2) × (payload: 4) × (concurrency: 2) = 16 cells
+- full four-group scope: (mode: 4) × (payload: 4) × (concurrency: 2) = 32 cells
 Then expand to concurrency=100.
 
 ## Statistical reporting

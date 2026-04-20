@@ -1,5 +1,10 @@
 # Implementation strategy
 
+Historical planning note: this document describes the original phased rollout.
+It is kept for context. The current codebase already implements both `raw` and
+`http1`, plus all four key exchange modes: `x25519`, `secp256r1`,
+`x25519mlkem768`, and `secp256r1mlkem768`.
+
 ## Phase 1 (required)
 
 Implement `raw` protocol end-to-end with:

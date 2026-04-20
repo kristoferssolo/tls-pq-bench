@@ -1,5 +1,10 @@
 # TODO (implementation plan)
 
+Historical planning note: this checklist reflects the original implementation
+plan. It is kept as project history; the current codebase has already completed
+the raw/http1 runner and supports `x25519`, `secp256r1`, `x25519mlkem768`, and
+`secp256r1mlkem768`.
+
 ## Milestone 1 -- Minimal client/server (raw protocol) \[MUST\]
 
 ### Server (`proto=raw`)

@@ -5,8 +5,9 @@ Reproducible benchmarking harness for comparing TLS 1.3 key exchange configurati
 ## Features
 
 - **Key Exchange Modes**
-  - Classical: `x25519`
-  - Hybrid PQ: `x25519mlkem768` (via `rustls` + `aws_lc_rs`)
+  - Primary pair: `x25519` and `x25519mlkem768`
+  - Secondary pair: `secp256r1` and `secp256r1mlkem768`
+  - Hybrid modes use `rustls` + `aws_lc_rs`
 
 - **Protocol Modes**
   - `raw` for low-overhead framed payload benchmarking
