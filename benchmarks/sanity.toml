@@ -1,3 +1,9 @@
+# Limited sanity subset for quick local checks.
+#
+# This file intentionally covers only the primary X25519 family on the default
+# local port layout. Use `benchmarks/baseline.toml` or a generated matrix for
+# full four-group coverage.
+
 [[benchmarks]]
 server = "127.0.0.1:4433"
 proto = "raw"

@@ -28,12 +28,17 @@ Goal: realistic request/response behavior.
 
 Client sends:
 
-- `GET /bytes/N` (or `GET /?n=N`)
+- `GET /bytes/{n}`
 
 Server replies:
 
-- HTTP/1.1 200 with Content-Length = N
-- body = N bytes payload (deterministic)
+- HTTP/1.1 200 with `Content-Length: n`
+- body = `n` bytes payload (deterministic)
+
+Notes:
+
+- the current client always sends `Host: localhost`
+- the current implementation does not support `GET /?n=N`
 
 Properties:
 
