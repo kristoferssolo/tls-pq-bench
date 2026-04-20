@@ -33,7 +33,7 @@ Reproducible benchmarking harness for comparing TLS 1.3 key exchange configurati
 - **Matrix Benchmarks**
   - TOML configuration file support
   - Run multiple benchmark configurations sequentially
-  - Each configuration: proto, mode, payload, iters, warmup, concurrency
+  - Each configuration: server, proto, mode, verification, payload, iters, warmup, concurrency
 
 ## Quick Start
 
@@ -57,15 +57,20 @@ Terminal 2 - Run benchmark:
 ./target/release/runner --server 127.0.0.1:4433 --proto raw --mode x25519 --iters 100 --warmup 10
 ```
 
+This CLI path defaults to insecure certificate verification unless `--ca-cert` is
+provided, which makes it suitable for quick local checks against the server's
+ephemeral self-signed certificate.
+
 ### Run Matrix Benchmarks
 
-Create a config file (`benchmarks.toml`):
+Create a config file (`matrix.toml`):
 
 ```toml
 [[benchmarks]]
 server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
+verification.kind = "insecure"
 payload = 1024
 iters = 100
 warmup = 10
@@ -73,12 +78,13 @@ concurrency = 1
 
 [[benchmarks]]
 server = "127.0.0.1:4433"
-proto = "http1"
-mode = "x25519mlkem768"
-payload = 1024
+proto = "raw"
+mode = "x25519"
+verification.kind = "insecure"
+payload = 4096
 iters = 100
 warmup = 10
-concurrency = 1
+concurrency = 4
 ```
 
 Run:
@@ -86,6 +92,53 @@ Run:
 ```bash
 ./target/release/runner --config matrix.toml
 ```
+
+Every benchmark entry must include a `verification` block. Use
+`verification.kind = "insecure"` for quick local runs, or
+`verification = { kind = "cacert", path = "certs/ca.der" }` when you want CA
+verification.
+
+### Verified Certificate Workflow
+
+Generate a persistent CA and server certificate:
+
+```bash
+just generate-certs
+```
+
+Start the server with the generated certificate pair:
+
+```bash
+./target/release/server \
+    --mode x25519 \
+    --proto raw \
+    --listen 127.0.0.1:4433 \
+    --cert certs/server.der \
+    --key certs/server.key
+```
+
+Run the client with CA verification enabled:
+
+```bash
+./target/release/runner \
+    --server 127.0.0.1:4433 \
+    --proto raw \
+    --mode x25519 \
+    --ca-cert certs/ca.der \
+    --iters 100 \
+    --warmup 10
+```
+
+For matrix runs, switch each benchmark entry to:
+
+```toml
+verification = { kind = "cacert", path = "certs/ca.der" }
+```
+
+The runner currently always uses TLS server name `localhost`, even if `--server`
+points to another IP or hostname. For remote runs, the presented certificate
+must still be valid for `localhost`, and the runner machine needs a copy of the
+matching CA file.
 
 ### Output
 
