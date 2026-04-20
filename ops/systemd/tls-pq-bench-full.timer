@@ -1,0 +1,10 @@
+[Unit]
+Description=Run TLS PQ daily full benchmark
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+Unit=tls-pq-bench-full.service
+
+[Install]
+WantedBy=timers.target
