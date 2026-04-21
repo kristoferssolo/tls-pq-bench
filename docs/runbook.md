@@ -1,106 +1,102 @@
 # Runbook
 
-## 1) Build
+This document is the practical guide for running benchmarks by hand.
+
+If you want automated two-host scheduling, use
+[scheduled-benchmarks.md](scheduled-benchmarks.md) instead.
+
+## Prerequisites
+
+- Rust toolchain installed
+- `cargo build --release` completed
+- two terminals if you are running client and server on the same machine
+- optional: `uv` for the helper scripts
+- optional: generated CA and server certs for verified runs
+
+## Workflow 1: Local Smoke Validation
+
+Use this to confirm the binaries, listeners, and protocol wiring work.
+
+Start the full local listener set:
 
 ```bash
-cargo build --release
+just multi-server
 ```
 
-## 2) Start server
-
-Quick local example with the server's ephemeral self-signed certificate:
+Run the smoke suite in another terminal:
 
 ```bash
-./target/release/server --mode x25519 --proto raw --listen 0.0.0.0:4433
+just smoke-all
 ```
 
-## 3) Run client benchmark
+Default local port layout:
 
-Raw example:
+| Port | Protocol | Mode |
+|------|----------|------|
+| 4433 | `raw` | `x25519` |
+| 4434 | `http1` | `x25519` |
+| 4435 | `raw` | `secp256r1` |
+| 4436 | `http1` | `secp256r1` |
+| 4437 | `raw` | `x25519mlkem768` |
+| 4438 | `http1` | `x25519mlkem768` |
+| 4439 | `raw` | `secp256r1mlkem768` |
+| 4440 | `http1` | `secp256r1mlkem768` |
+
+The smoke path uses insecure client verification and the server's ephemeral
+self-signed certificate. Treat it as a development-only workflow.
+
+## Workflow 2: One Manual Benchmark
+
+Use this when you want a controlled single run without a TOML matrix.
+
+Start one server:
+
+```bash
+./target/release/server \
+    --mode x25519 \
+    --proto raw \
+    --listen 127.0.0.1:4433
+```
+
+Run the client:
 
 ```bash
 ./target/release/runner \
-    --server 1.2.3.4:4433 \
+    --server 127.0.0.1:4433 \
+    --server-name localhost \
     --proto raw \
     --mode x25519 \
-    --server-name bench.example.com \
-    --payload-bytes 1024 \
-    --concurrency 10 \
-    --iters 500 \
-    --warmup 50 \
-    --out results.jsonl
-```
-
-Without `--ca-cert`, the runner uses insecure certificate verification. That is
-fine for ad hoc local testing, but not for CA-verified runs.
-
-HTTP/1.1 example:
-
-```bash
-./target/release/server --mode x25519mlkem768 --proto http1 --listen 0.0.0.0:4433
-./target/release/runner \
-    --server 1.2.3.4:4433 \
-    --proto http1 \
-    --mode x25519mlkem768 \
     --payload-bytes 1024 \
     --concurrency 1 \
     --iters 200 \
     --warmup 20 \
-    --out results-http1.jsonl
+    --out results.jsonl
 ```
 
-### Matrix Benchmarks
+Notes:
 
-Create a config file (`matrix.toml`):
+- `--server-name` defaults to `localhost`
+- without `--ca-cert`, verification is insecure
+- `--out` is optional; without it, JSONL is written to stdout
 
-```toml
-[[benchmarks]]
-server = "1.2.3.4:4433"
-proto = "raw"
-mode = "x25519"
-verification.kind = "insecure"
-payload = 1024
-iters = 500
-warmup = 50
-concurrency = 1
+## Workflow 3: CA-Verified Benchmarking
 
-[[benchmarks]]
-server = "1.2.3.4:4433"
-proto = "raw"
-mode = "x25519"
-verification.kind = "insecure"
-payload = 4096
-iters = 500
-warmup = 50
-concurrency = 10
-```
+Use this for reproducible local baselines and all serious remote runs.
 
-Run matrix:
-
-```bash
-./target/release/runner --config matrix.toml
-```
-
-Each JSONL record now includes both `proto` and `mode`, so `raw` and `http1`
-runs can be aggregated separately during analysis.
-
-## 3a) Verified certificate workflow
-
-Generate a persistent CA and server certificate pair:
+Generate a CA and server certificate:
 
 ```bash
 just generate-certs
 ```
 
-For a two-machine run, generate the certificate for the DNS name or private IP
-the runner will verify:
+Remote examples:
 
 ```bash
-just generate-certs certs 365 localhost 10.0.1.23
 just generate-certs certs 365 bench.example.com
+just generate-certs certs 365 localhost 10.0.1.23
 ```
 
-Start the server with the generated certificate and key:
+Start the server with the generated certificate pair:
 
 ```bash
 ./target/release/server \
@@ -111,41 +107,113 @@ Start the server with the generated certificate and key:
     --key certs/server.key
 ```
 
-Run the benchmark with CA verification:
+Run the client with CA verification enabled:
 
 ```bash
 ./target/release/runner \
-    --server 1.2.3.4:4433 \
+    --server 10.0.1.23:4433 \
+    --server-name bench.example.com \
+    --ca-cert certs/ca.der \
     --proto raw \
     --mode x25519 \
     --payload-bytes 1024 \
     --concurrency 10 \
     --iters 500 \
     --warmup 50 \
-    --ca-cert certs/ca.der \
     --out results.jsonl
 ```
 
-For matrix benchmarks, every entry must include a `verification` block. Use:
+Rules to keep straight:
 
-```toml
-verification = { kind = "cacert", path = "certs/ca.der" }
-server_name = "bench.example.com"
-```
+- `server_name` must match the DNS name or IP in the server certificate SAN
+- the runner host needs a copy of the matching `ca.der`
+- the same `server_name` is also used as the HTTP `Host` header in `http1` mode
 
-If omitted, `server_name` defaults to `localhost`. For two-machine experiments,
-set it to the DNS name or IP address covered by the server certificate. The
-runner uses that value for both TLS verification and the HTTP/1.1 `Host`
-header, and the runner host still needs a copy of the matching `certs/ca.der`.
+## Workflow 4: Matrix Benchmarks
 
-## 4) Collect perf stats (optional)
+Use a TOML config when you want to sweep payloads, modes, or concurrency.
 
-Run on the client:
+### Bundled Matrices
+
+- `benchmarks/sanity.toml`: very small local validation matrix
+- `benchmarks/baseline.toml`: larger baseline matrix for the default listener layout
+
+Run one:
 
 ```bash
-perf stat -e cycles,instructions,cache-misses ./target/release/runner ...
+./target/release/runner --config benchmarks/sanity.toml
 ```
 
-## 5) Summarize
+### Minimal Example
 
-Use a script to compute p50/p95/p99 from JSONL.
+```toml
+[[benchmarks]]
+verification.kind = "insecure"
+server = "127.0.0.1:4433"
+server_name = "localhost"
+proto = "raw"
+mode = "x25519"
+payload = 1024
+iters = 100
+warmup = 10
+concurrency = 1
+
+[[benchmarks]]
+verification = { kind = "cacert", path = "certs/ca.der" }
+server = "10.0.1.23:4434"
+server_name = "bench.example.com"
+proto = "http1"
+mode = "x25519mlkem768"
+payload = 1048576
+iters = 200
+warmup = 20
+concurrency = 10
+```
+
+Run it:
+
+```bash
+./target/release/runner --config matrix.toml --out results.jsonl
+```
+
+Every entry must include a `verification` block.
+
+## Workflow 5: Generated Matrices
+
+Use the generator when writing large matrices by hand becomes error-prone.
+
+Generate a default matrix:
+
+```bash
+uv run --script scripts/generate_benchmark_matrix.py --output matrix.toml
+```
+
+Generate a remote recurring profile:
+
+```bash
+uv run --script scripts/generate_benchmark_matrix.py \
+    --profile recurring \
+    --host 10.0.1.23 \
+    --server-name bench.example.com \
+    --ca-cert certs/ca.der \
+    --output benchmarks/remote-recurring.toml
+```
+
+## Summarizing Results
+
+The repo ships with a JSONL analyzer:
+
+```bash
+uv run --script scripts/analyze_results.py results.jsonl
+```
+
+Useful variants:
+
+```bash
+uv run --script scripts/analyze_results.py results.jsonl --unit us
+uv run --script scripts/analyze_results.py results.jsonl --format markdown
+uv run --script scripts/analyze_results.py results.jsonl --group-by proto mode
+```
+
+See [measurement-methodology.md](measurement-methodology.md) for metric and
+schema details.

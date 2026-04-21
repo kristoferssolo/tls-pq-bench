@@ -1,40 +1,45 @@
 # tls-pq-bench
 
-Reproducible benchmarking harness for comparing TLS 1.3 key exchange configurations.
+`tls-pq-bench` is a reproducible TLS 1.3 benchmark harness for comparing
+classical and post-quantum hybrid key exchange groups.
 
-## Features
+The project benchmarks two application carriers:
 
-- **Key Exchange Modes**
-  - Primary pair: `x25519` and `x25519mlkem768`
-  - Secondary pair: `secp256r1` and `secp256r1mlkem768`
-  - Hybrid modes use `rustls` + `aws_lc_rs`
+- `raw`: minimal framing for low-overhead measurements
+- `http1`: HTTP/1.1 for a more realistic application path
 
-- **Protocol Modes**
-  - `raw` for low-overhead framed payload benchmarking
-  - `http1` for HTTP/1.1 request and response benchmarking
+And four key exchange modes:
 
-- **Metrics**
-  - TCP connection latency (nanoseconds)
-  - Handshake latency (nanoseconds)
-  - TTLB - Time-to-Last-Byte (nanoseconds)
+- `x25519`
+- `secp256r1`
+- `x25519mlkem768`
+- `secp256r1mlkem768`
 
-- **Benchmark Control**
-  - Warmup iterations (excluded from results)
-  - Configurable iterations
-  - Concurrency control (parallel connections)
-  - Configurable payload sizes
+Each benchmark record captures:
 
-- **Reproducibility**
-  - Structured logging (tracing)
-  - Run ID for correlating logs
-  - Rust version, OS, arch recorded
-  - Command line arguments logged
-  - Negotiated cipher suite logged
+- TCP connect latency
+- TLS handshake latency
+- TTLB (time to last byte)
 
-- **Matrix Benchmarks**
-  - TOML configuration file support
-  - Run multiple benchmark configurations sequentially
-  - Each configuration: server, proto, mode, verification, payload, iters, warmup, concurrency
+All raw metrics are stored in nanoseconds as JSONL.
+
+## What To Read First
+
+- Want to run something quickly: see [Quick Start](#quick-start)
+- Want the full manual workflow: [docs/runbook.md](docs/runbook.md)
+- Want scheduled remote runs: [docs/scheduled-benchmarks.md](docs/scheduled-benchmarks.md)
+- Want metric and schema details: [docs/measurement-methodology.md](docs/measurement-methodology.md)
+- Want protocol semantics: [docs/protocols.md](docs/protocols.md)
+
+## Repository Map
+
+- `server`: benchmark TLS server
+- `runner`: benchmark client and matrix runner
+- `common`: shared protocol and telemetry code
+- `benchmarks/`: example matrix files
+- `scripts/`: analysis and matrix-generation helpers
+- `ops/`: environment files and systemd units
+- `docs/`: workflow and reference documentation
 
 ## Quick Start
 
@@ -44,62 +49,75 @@ Reproducible benchmarking harness for comparing TLS 1.3 key exchange configurati
 cargo build --release
 ```
 
-### Run Single Benchmark
+### Fastest Local Smoke Test
 
-Terminal 1 - Start server:
-
-```bash
-./target/release/server --mode x25519 --proto raw --listen 127.0.0.1:4433
-```
-
-Terminal 2 - Run benchmark:
+Start the default local listener set:
 
 ```bash
-./target/release/runner --server 127.0.0.1:4433 --proto raw --mode x25519 --iters 100 --warmup 10
+just multi-server
 ```
 
-This CLI path defaults to insecure certificate verification unless `--ca-cert` is
-provided, which makes it suitable for quick local checks against the server's
-ephemeral self-signed certificate.
-
-### Run Matrix Benchmarks
-
-Create a config file (`matrix.toml`):
-
-```toml
-[[benchmarks]]
-server = "127.0.0.1:4433"
-proto = "raw"
-mode = "x25519"
-verification.kind = "insecure"
-payload = 1024
-iters = 100
-warmup = 10
-concurrency = 1
-
-[[benchmarks]]
-server = "127.0.0.1:4433"
-proto = "raw"
-mode = "x25519"
-verification.kind = "insecure"
-payload = 4096
-iters = 100
-warmup = 10
-concurrency = 4
-```
-
-Run:
+In another terminal, run the built-in smoke matrix:
 
 ```bash
+just smoke-all
+```
+
+This path uses the server's ephemeral self-signed certificate and insecure
+client verification. It is intended only for local validation.
+
+### Run One Benchmark Manually
+
+Start one server:
+
+```bash
+./target/release/server \
+    --mode x25519 \
+    --proto raw \
+    --listen 127.0.0.1:4433
+```
+
+Run one benchmark:
+
+```bash
+./target/release/runner \
+    --server 127.0.0.1:4433 \
+    --proto raw \
+    --mode x25519 \
+    --payload-bytes 1024 \
+    --iters 100 \
+    --warmup 10
+```
+
+Without `--ca-cert`, the runner uses insecure certificate verification. That is
+appropriate for quick local checks only.
+
+### Run A Matrix
+
+Use one of the bundled configs:
+
+```bash
+./target/release/runner --config benchmarks/sanity.toml
+```
+
+Or generate your own:
+
+```bash
+uv run --script scripts/generate_benchmark_matrix.py --output matrix.toml
 ./target/release/runner --config matrix.toml
 ```
 
-Every benchmark entry must include a `verification` block. Use
-`verification.kind = "insecure"` for quick local runs, or
-`verification = { kind = "cacert", path = "certs/ca.der" }` when you want CA
-verification.
+## Recommended Workflows
 
-### Verified Certificate Workflow
+### 1. Local Development
+
+Use this when you are validating correctness or making code changes.
+
+- `just multi-server`
+- `just smoke-all`
+- `just sanity-matrix`
+
+### 2. Verified Local Or Remote Runs
 
 Generate a persistent CA and server certificate:
 
@@ -110,8 +128,8 @@ just generate-certs
 For a remote host, include the DNS name or IP that the runner will verify:
 
 ```bash
-just generate-certs certs 365 localhost 10.0.1.23
 just generate-certs certs 365 bench.example.com
+just generate-certs certs 365 localhost 10.0.1.23
 ```
 
 Start the server with the generated certificate pair:
@@ -120,87 +138,72 @@ Start the server with the generated certificate pair:
 ./target/release/server \
     --mode x25519 \
     --proto raw \
-    --listen 127.0.0.1:4433 \
+    --listen 0.0.0.0:4433 \
     --cert certs/server.der \
     --key certs/server.key
 ```
 
-Run the client with CA verification enabled:
+Run the client with CA verification:
 
 ```bash
 ./target/release/runner \
-    --server 127.0.0.1:4433 \
+    --server 10.0.1.23:4433 \
+    --server-name bench.example.com \
+    --ca-cert certs/ca.der \
     --proto raw \
     --mode x25519 \
-    --server-name localhost \
-    --ca-cert certs/ca.der \
     --iters 100 \
     --warmup 10
 ```
 
-For matrix runs, switch each benchmark entry to:
+`server_name` is used for both TLS verification and the HTTP/1.1 `Host` header.
 
-```toml
-verification = { kind = "cacert", path = "certs/ca.der" }
-```
+### 3. Scheduled Two-Host Benchmarks
 
-The runner now defaults to `server_name = "localhost"` for local runs. Override
-it with `--server-name <hostname>` on the CLI, or `server_name = "<hostname>"`
-per benchmark in TOML, when the server presents a certificate for a remote DNS
-name. The same value is used for TLS verification and the HTTP/1.1 `Host`
-header. When using an IP-based certificate for a private EC2 address, generate
-it with `just generate-certs certs 365 localhost <private-ip>` and pass the same IP via
-`--server-name`.
+The repo includes helpers for a persistent server host plus a runner host with
+systemd timers.
 
-### Output
+Main entry points:
 
-Results are emitted as JSONL to stdout or a file:
+- `just prod-server-service env_file=/etc/tls-pq-bench/server.env`
+- `just prod-schedule env_file=/etc/tls-pq-bench/scheduled.env`
+
+The full setup is documented in
+[docs/scheduled-benchmarks.md](docs/scheduled-benchmarks.md).
+
+## Result Format
+
+Each iteration is emitted as one JSONL record:
 
 ```jsonl
 {"run_id":"0195f8cf-2f6f-7e9b-9c52-6e5d6b7d0a10","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":100,"warmup":10,"tcp_ns":120000,"handshake_ns":500000,"ttlb_ns":650000}
-{"run_id":"0195f8cf-2f6f-7e9b-9c52-6e5d6b7d0a10","iteration":1,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":100,"warmup":10,"tcp_ns":130000,"handshake_ns":560000,"ttlb_ns":760000}
 ```
 
-The raw records always store timing metrics in nanoseconds (`tcp_ns`,
-`handshake_ns`, `ttlb_ns`). The bundled analyzer summarizes those fields and
-can convert them to `us` or `ms` for presentation.
-
-### Logging
-
-Enable debug logs with `RUST_LOG`:
+Use the bundled analyzer to summarize one or more result files:
 
 ```bash
-RUST_LOG=info ./target/release/runner --server 127.0.0.1:4433
+uv run --script scripts/analyze_results.py results.jsonl
 ```
 
-Output includes:
+Common options:
 
-- Run ID for correlation
-- Rust version, OS, arch
-- Command used
-- Negotiated cipher suite
-- Benchmark configuration
+- `--unit ns|us|ms`
+- `--format table|markdown|json|csv`
+- `--group-by proto mode payload_bytes concurrency`
 
-### Running On A Server With systemd
+## Documentation Guide
 
-For a persistent server host, copy [ops/server.env.example](ops/server.env.example)
-to `/etc/tls-pq-bench/server.env`, set `REPO_DIR` and `SERVER_BIN`, then
-install the bundled unit:
-
-```bash
-sudo mkdir -p /etc/tls-pq-bench
-sudo cp ops/server.env.example /etc/tls-pq-bench/server.env
-$EDITOR /etc/tls-pq-bench/server.env
-just prod-server-service env_file=/etc/tls-pq-bench/server.env
-```
-
-Inspect the service with:
-
-```bash
-systemctl status tls-pq-bench-server.service
-journalctl -u tls-pq-bench-server.service -n 100 --no-pager
-```
+- [docs/runbook.md](docs/runbook.md): step-by-step manual runs
+- [docs/scheduled-benchmarks.md](docs/scheduled-benchmarks.md): recurring remote runs
+- [docs/protocols.md](docs/protocols.md): `raw` vs `http1`
+- [docs/measurement-methodology.md](docs/measurement-methodology.md): metrics and schema
+- [docs/environment.md](docs/environment.md): environment checklist
+- [docs/experiment-plan.md](docs/experiment-plan.md): suggested study design
+- [docs/results-template.md](docs/results-template.md): reporting template
+- [docs/baseline-analysis.md](docs/baseline-analysis.md): summary of baseline findings
+- [docs/implementation-strategy.md](docs/implementation-strategy.md): historical rollout notes
 
 ## License
 
-Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
+[MIT license](LICENSE-MIT) at your option.
