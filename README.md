@@ -172,6 +172,26 @@ Output includes:
 - Negotiated cipher suite
 - Benchmark configuration
 
+### Running On A Server With systemd
+
+For a persistent server host, copy [ops/server.env.example](ops/server.env.example)
+to `/etc/tls-pq-bench/server.env`, set `REPO_DIR` and `SERVER_BIN`, then
+install the bundled unit:
+
+```bash
+sudo mkdir -p /etc/tls-pq-bench
+sudo cp ops/server.env.example /etc/tls-pq-bench/server.env
+$EDITOR /etc/tls-pq-bench/server.env
+just prod-server-service env_file=/etc/tls-pq-bench/server.env
+```
+
+Inspect the service with:
+
+```bash
+systemctl status tls-pq-bench-server.service
+journalctl -u tls-pq-bench-server.service -n 100 --no-pager
+```
+
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.

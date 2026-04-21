@@ -20,6 +20,12 @@ benchmarks:
 - Generate or install a persistent certificate whose SAN covers the DNS name or
   IP you will use as `SERVER_NAME`.
 - Keep all eight server listeners running on ports `4433` through `4440`.
+- For a persistent server process, copy `ops/server.env.example` to
+  `/etc/tls-pq-bench/server.env`, fill in `REPO_DIR` and `SERVER_BIN`, then run:
+
+```bash
+just prod-server-service env_file=/etc/tls-pq-bench/server.env
+```
 
 ## 2) Prepare the runner VPS
 

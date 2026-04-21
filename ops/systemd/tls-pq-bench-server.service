@@ -1,0 +1,16 @@
+[Unit]
+Description=TLS PQ benchmark server listener set
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/tls-pq-bench/server.env
+WorkingDirectory=/tmp
+ExecStart=/usr/bin/bash -lc 'cd "$REPO_DIR" && exec ./scripts/run_server_set.sh'
+Restart=on-failure
+RestartSec=2
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target
