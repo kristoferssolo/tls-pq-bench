@@ -69,9 +69,10 @@ prod-schedule env_file="/etc/tls-pq-bench/scheduled.env": build
 
 # Run a parameterized benchmark against a live server
 [group("run")]
-runner server_addr="127.0.0.1:4433" proto="raw" mode="x25519" payload="1024" iters="200" warmup="20" concurrency="1": build
+runner server_addr="127.0.0.1:4433" server_name="localhost" proto="raw" mode="x25519" payload="1024" iters="200" warmup="20" concurrency="1": build
     {{ runner }} \
         --server {{ server_addr }} \
+        --server-name {{ server_name }} \
         --proto {{ proto }} \
         --mode {{ mode }} \
         --payload-bytes {{ payload }} \
@@ -196,10 +197,11 @@ generate-certs dir="certs" days="365":
 _setup:
     mkdir -p {{ results_dir }} {{ logs_dir }} {{ benchmarks_dir }}
 
-_bench server_addr proto mode out="" payload="1024" iters="200" warmup="20" concurrency="1": build
+_bench server_addr proto mode server_name="localhost" out="" payload="1024" iters="200" warmup="20" concurrency="1": build
     just _setup
     {{ runner }} \
         --server        {{ server_addr }} \
+        --server-name   {{ server_name }} \
         --proto         {{ proto }} \
         --mode          {{ mode }} \
         --payload-bytes {{ payload }} \
