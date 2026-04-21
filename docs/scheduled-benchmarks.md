@@ -3,7 +3,7 @@
 This repo includes a runner-side scheduling bundle for repeated two-VPS
 benchmarks:
 
-- `scripts/generate_remote_schedule_configs.sh`
+- `scripts/generate_benchmark_matrix.py`
 - `scripts/run_scheduled_benchmarks.sh`
 - `ops/scheduled-benchmarks.env.example`
 - `ops/systemd/tls-pq-bench-{track,full}.{service,timer}`
@@ -42,8 +42,26 @@ just prod-server-service env_file=/etc/tls-pq-bench/server.env
 Generate the recurring and daily configs:
 
 ```bash
-SCHEDULE_ENV_FILE=/etc/tls-pq-bench/scheduled.env \
-    ./scripts/generate_remote_schedule_configs.sh
+# shellcheck disable=SC1090
+source /etc/tls-pq-bench/scheduled.env
+
+uv run --script scripts/generate_benchmark_matrix.py \
+    --profile recurring \
+    --host "${SERVER_HOST}" \
+    --server-name "${SERVER_NAME}" \
+    --ca-cert "${CA_CERT}" \
+    --iters "${TRACK_ITERS}" \
+    --warmup "${TRACK_WARMUP}" \
+    --output "${TRACK_CONFIG}"
+
+uv run --script scripts/generate_benchmark_matrix.py \
+    --profile full \
+    --host "${SERVER_HOST}" \
+    --server-name "${SERVER_NAME}" \
+    --ca-cert "${CA_CERT}" \
+    --iters "${FULL_ITERS}" \
+    --warmup "${FULL_WARMUP}" \
+    --output "${FULL_CONFIG}"
 ```
 
 That writes:

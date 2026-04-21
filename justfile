@@ -1,4 +1,4 @@
-export RUSTC_WRAPPER := "sccache"
+export RUSTC_WRAPPER :=  env("RUSTC_WRAPPER", "sccache")
 export RUST_LOG := env("RUST_LOG", "warn")
 
 # -euo pipefail; -c must be last so just appends the script correctly
@@ -72,7 +72,37 @@ prod-schedule env_file="/etc/tls-pq-bench/scheduled.env": build
         exit 1
     fi
 
-    SCHEDULE_ENV_FILE="{{ env_file }}" ./scripts/generate_remote_schedule_configs.sh
+    # shellcheck disable=SC1090
+    source "{{ env_file }}"
+    : "${SERVER_HOST:?set SERVER_HOST to the remote benchmark server IP or hostname}"
+    : "${SERVER_NAME:?set SERVER_NAME to the TLS DNS name or IP to verify}"
+
+    CA_CERT="${CA_CERT:-certs/ca.der}"
+    TRACK_CONFIG="${TRACK_CONFIG:-$PWD/benchmarks/remote-recurring.toml}"
+    FULL_CONFIG="${FULL_CONFIG:-$PWD/benchmarks/remote-full.toml}"
+    TRACK_ITERS="${TRACK_ITERS:-200}"
+    TRACK_WARMUP="${TRACK_WARMUP:-20}"
+    FULL_ITERS="${FULL_ITERS:-200}"
+    FULL_WARMUP="${FULL_WARMUP:-20}"
+
+    uv run --script scripts/generate_benchmark_matrix.py \
+        --profile recurring \
+        --host "${SERVER_HOST}" \
+        --server-name "${SERVER_NAME}" \
+        --ca-cert "${CA_CERT}" \
+        --iters "${TRACK_ITERS}" \
+        --warmup "${TRACK_WARMUP}" \
+        --output "${TRACK_CONFIG}"
+
+    uv run --script scripts/generate_benchmark_matrix.py \
+        --profile full \
+        --host "${SERVER_HOST}" \
+        --server-name "${SERVER_NAME}" \
+        --ca-cert "${CA_CERT}" \
+        --iters "${FULL_ITERS}" \
+        --warmup "${FULL_WARMUP}" \
+        --output "${FULL_CONFIG}"
+
     sudo install -m 0644 ops/systemd/tls-pq-bench-track.service /etc/systemd/system/tls-pq-bench-track.service
     sudo install -m 0644 ops/systemd/tls-pq-bench-track.timer /etc/systemd/system/tls-pq-bench-track.timer
     sudo install -m 0644 ops/systemd/tls-pq-bench-full.service /etc/systemd/system/tls-pq-bench-full.service
