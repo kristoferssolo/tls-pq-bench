@@ -75,7 +75,7 @@ The default schedule is:
 Each scheduled run creates:
 
 - `results/scheduled/<profile>-<timestamp>.jsonl`
-- `results/scheduled/<profile>-<timestamp>.meta`
+- `results/scheduled/<profile>-<timestamp>.meta` (structured JSON metadata)
 - `.logs/scheduled/<profile>-<timestamp>.log`
 
 The wrapper script uses `flock` to avoid overlapping runs of the same profile.

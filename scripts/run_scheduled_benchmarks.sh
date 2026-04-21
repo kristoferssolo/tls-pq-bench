@@ -59,26 +59,30 @@ timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 result_path="${RESULTS_DIR}/${profile}-${timestamp}.jsonl"
 log_path="${LOG_DIR}/${profile}-${timestamp}.log"
 meta_path="${RESULTS_DIR}/${profile}-${timestamp}.meta"
-
-{
-    printf 'profile=%s\n' "${profile}"
-    printf 'started_at_utc=%s\n' "$(date -u +%FT%TZ)"
-    printf 'config=%s\n' "${config_path}"
-    printf 'runner=%s\n' "${RUNNER_BIN}"
-    printf 'git_commit=%s\n' "$(git -C "${REPO_DIR}" rev-parse HEAD 2>/dev/null || echo unknown)"
-    printf 'host=%s\n' "$(hostname)"
-} >"${meta_path}"
+runner_git_commit="$(git -C "${REPO_DIR}" rev-parse HEAD 2>/dev/null || echo unknown)"
+runner_host="$(hostname)"
 
 set +e
-"${RUNNER_BIN}" --config "${config_path}" >"${result_path}" 2>"${log_path}"
+TLS_PQ_BENCH_SCHEDULE_PROFILE="${profile}" \
+TLS_PQ_BENCH_CONFIG_PATH="${config_path}" \
+TLS_PQ_BENCH_RESULT_PATH="${result_path}" \
+TLS_PQ_BENCH_LOG_PATH="${log_path}" \
+TLS_PQ_BENCH_RUNNER_GIT_COMMIT="${runner_git_commit}" \
+TLS_PQ_BENCH_RUNNER_HOST="${runner_host}" \
+TLS_PQ_BENCH_RUNNER_INSTANCE_TYPE="${RUNNER_INSTANCE_TYPE:-}" \
+TLS_PQ_BENCH_RUNNER_REGION="${RUNNER_REGION:-}" \
+TLS_PQ_BENCH_RUNNER_AZ="${RUNNER_AZ:-}" \
+TLS_PQ_BENCH_SERVER_GIT_COMMIT="${SERVER_GIT_COMMIT:-}" \
+TLS_PQ_BENCH_SERVER_HOST="${SERVER_HOST:-}" \
+TLS_PQ_BENCH_SERVER_INSTANCE_TYPE="${SERVER_INSTANCE_TYPE:-}" \
+TLS_PQ_BENCH_SERVER_REGION="${SERVER_REGION:-}" \
+TLS_PQ_BENCH_SERVER_AZ="${SERVER_AZ:-}" \
+"${RUNNER_BIN}" \
+    --config "${config_path}" \
+    --out "${result_path}" \
+    --run-meta-out "${meta_path}" \
+    2>"${log_path}"
 status=$?
 set -e
-
-{
-    printf 'finished_at_utc=%s\n' "$(date -u +%FT%TZ)"
-    printf 'status=%s\n' "${status}"
-    printf 'result=%s\n' "${result_path}"
-    printf 'log=%s\n' "${log_path}"
-} >>"${meta_path}"
 
 exit "${status}"

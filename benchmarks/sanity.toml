@@ -9,6 +9,7 @@ server = "127.0.0.1:4433"
 proto = "raw"
 mode = "x25519"
 verification.kind = "insecure"
+server_name = "localhost"
 payload = 1024
 iters = 5
 warmup = 1
@@ -19,6 +20,7 @@ server = "127.0.0.1:4434"
 proto = "http1"
 mode = "x25519"
 verification.kind = "insecure"
+server_name = "localhost"
 payload = 1024
 iters = 5
 warmup = 1
@@ -27,8 +29,9 @@ concurrency = 1
 [[benchmarks]]
 server = "127.0.0.1:4435"
 proto = "raw"
-mode = "x25519mlkem768"
+mode = "secp256r1"
 verification.kind = "insecure"
+server_name = "localhost"
 payload = 1024
 iters = 5
 warmup = 1
@@ -37,8 +40,53 @@ concurrency = 1
 [[benchmarks]]
 server = "127.0.0.1:4436"
 proto = "http1"
+mode = "secp256r1"
+verification.kind = "insecure"
+server_name = "localhost"
+payload = 1024
+iters = 5
+warmup = 1
+concurrency = 1
+
+[[benchmarks]]
+server = "127.0.0.1:4437"
+proto = "raw"
 mode = "x25519mlkem768"
 verification.kind = "insecure"
+server_name = "localhost"
+payload = 1024
+iters = 5
+warmup = 1
+concurrency = 1
+
+[[benchmarks]]
+server = "127.0.0.1:4438"
+proto = "http1"
+mode = "x25519mlkem768"
+verification.kind = "insecure"
+server_name = "localhost"
+payload = 1024
+iters = 5
+warmup = 1
+concurrency = 1
+
+[[benchmarks]]
+server = "127.0.0.1:4439"
+proto = "raw"
+mode = "secp256r1mlkem768"
+verification.kind = "insecure"
+server_name = "localhost"
+payload = 1024
+iters = 5
+warmup = 1
+concurrency = 1
+
+[[benchmarks]]
+server = "127.0.0.1:4440"
+proto = "http1"
+mode = "secp256r1mlkem768"
+verification.kind = "insecure"
+server_name = "localhost"
 payload = 1024
 iters = 5
 warmup = 1

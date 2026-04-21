@@ -10,15 +10,16 @@ mod args;
 mod bench;
 mod config;
 mod error;
+mod metadata;
 mod tls;
 
 use crate::{args::Args, bench::run_benchmark, config::Config, tls::build_tls_config};
 use clap::Parser;
 use common::prelude::init_tracing;
+use metadata::{RunMetadata, unix_time_ms, write_run_metadata};
 use miette::{Context, IntoDiagnostic};
 use rustls::pki_types::ServerName;
 use std::{
-    env,
     fs::File,
     io::{self, BufWriter, Write},
     path::Path,
@@ -31,18 +32,23 @@ use uuid::Uuid;
 #[tokio::main]
 async fn main() -> miette::Result<()> {
     let run_id = Uuid::now_v7();
+    let started_at_unix_ms = unix_time_ms();
     init_tracing(std::io::stderr);
 
+    let command = std::env::args().collect::<Vec<_>>().join(" ");
     info!(
         run_id = %run_id,
         rust_version = env!("RUSTC_VERSION"),
-        os = env::consts::OS,
-        arch = env::consts::ARCH,
-        command = env::args().collect::<Vec<_>>().join(" "),
+        os = std::env::consts::OS,
+        arch = std::env::consts::ARCH,
+        command,
         "benchmark started"
     );
 
     let args = Args::parse();
+    let config_file = args.config.clone();
+    let result_path = args.out.clone();
+    let run_meta_out = args.run_meta_out.clone();
     let mut output = create_output(args.out.as_deref())?;
 
     let config: Config = if let Some(config_path) = &args.config {
@@ -53,44 +59,64 @@ async fn main() -> miette::Result<()> {
         args.try_into()?
     };
 
-    for benchmark in &config.benchmarks {
-        info!(
-            server = %benchmark.server,
-            server_name = %benchmark.server_name,
-            proto = %benchmark.proto,
-            mode = %benchmark.mode,
-            payload = benchmark.payload,
-            iters = benchmark.iters,
-            warmup = benchmark.warmup,
-            concurrency = benchmark.concurrency,
-            "running benchmark"
+    let run_result: miette::Result<()> = async {
+        for benchmark in &config.benchmarks {
+            info!(
+                server = %benchmark.server,
+                server_name = %benchmark.server_name,
+                proto = %benchmark.proto,
+                mode = %benchmark.mode,
+                payload = benchmark.payload,
+                iters = benchmark.iters,
+                warmup = benchmark.warmup,
+                concurrency = benchmark.concurrency,
+                "running benchmark"
+            );
+
+            let tls_config = build_tls_config(benchmark.mode, &benchmark.verification)?;
+            let tls_connector = TlsConnector::from(Arc::new(tls_config));
+            let server_name = ServerName::try_from(benchmark.server_name.clone())
+                .into_diagnostic()
+                .with_context(|| format!("invalid server name {}", benchmark.server_name))?;
+
+            run_benchmark(run_id, benchmark, &tls_connector, &server_name, &mut output)
+                .await
+                .with_context(|| {
+                    format!(
+                        "benchmark failed: server={} server_name={} proto={} mode={} payload={} concurrency={} iters={} warmup={} timeout_secs={}",
+                        benchmark.server,
+                        benchmark.server_name,
+                        benchmark.proto,
+                        benchmark.mode,
+                        benchmark.payload,
+                        benchmark.concurrency,
+                        benchmark.iters,
+                        benchmark.warmup,
+                        benchmark.timeout_secs,
+                    )
+                })?;
+        }
+
+        Ok(())
+    }
+    .await;
+
+    let finished_at_unix_ms = unix_time_ms();
+    if let Some(path) = run_meta_out.as_deref() {
+        let metadata = RunMetadata::from_config(
+            run_id,
+            &config,
+            config_file,
+            result_path,
+            started_at_unix_ms,
+            finished_at_unix_ms,
+            run_result.as_ref().err().map(|error| format!("{error:#}")),
         );
 
-        let tls_config = build_tls_config(benchmark.mode, &benchmark.verification)?;
-        let tls_connector = TlsConnector::from(Arc::new(tls_config));
-        let server_name = ServerName::try_from(benchmark.server_name.clone())
-            .into_diagnostic()
-            .with_context(|| format!("invalid server name {}", benchmark.server_name))?;
-
-        run_benchmark(run_id, benchmark, &tls_connector, &server_name, &mut output)
-            .await
-            .with_context(|| {
-                format!(
-                    "benchmark failed: server={} server_name={} proto={} mode={} payload={} concurrency={} iters={} warmup={} timeout_secs={}",
-                    benchmark.server,
-                    benchmark.server_name,
-                    benchmark.proto,
-                    benchmark.mode,
-                    benchmark.payload,
-                    benchmark.concurrency,
-                    benchmark.iters,
-                    benchmark.warmup,
-                    benchmark.timeout_secs,
-                )
-            })?;
+        write_run_metadata(path, &metadata)?;
     }
 
-    Ok(())
+    run_result
 }
 
 fn create_output(path: Option<&Path>) -> miette::Result<Box<dyn Write + Send>> {

@@ -46,6 +46,10 @@ pub struct Args {
     #[arg(long)]
     pub out: Option<PathBuf>,
 
+    /// Output file for structured run metadata (JSON)
+    #[arg(long)]
+    pub run_meta_out: Option<PathBuf>,
+
     /// Config file for matrix benchmarks (TOML)
     #[arg(long, short)]
     pub config: Option<PathBuf>,
