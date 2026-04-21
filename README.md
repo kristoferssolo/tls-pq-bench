@@ -107,6 +107,13 @@ Generate a persistent CA and server certificate:
 just generate-certs
 ```
 
+For a remote host, include the DNS name or IP that the runner will verify:
+
+```bash
+just generate-certs certs 365 localhost 10.0.1.23
+just generate-certs certs 365 bench.example.com
+```
+
 Start the server with the generated certificate pair:
 
 ```bash
@@ -141,7 +148,9 @@ The runner now defaults to `server_name = "localhost"` for local runs. Override
 it with `--server-name <hostname>` on the CLI, or `server_name = "<hostname>"`
 per benchmark in TOML, when the server presents a certificate for a remote DNS
 name. The same value is used for TLS verification and the HTTP/1.1 `Host`
-header.
+header. When using an IP-based certificate for a private EC2 address, generate
+it with `just generate-certs certs 365 localhost <private-ip>` and pass the same IP via
+`--server-name`.
 
 ### Output
 

@@ -183,8 +183,28 @@ setup:
     cargo install cargo-nextest sccache
 
 [group("dev")]
-generate-certs dir="certs" days="365":
+generate-certs dir="certs" days="365" server_name="localhost" server_ip="":
+    #!/usr/bin/env bash
     mkdir -p {{ dir }}
+
+    cn="{{ server_name }}"
+    if [[ -z "$cn" && -n "{{ server_ip }}" ]]; then
+        cn="{{ server_ip }}"
+    fi
+    if [[ -z "$cn" ]]; then
+        echo "generate-certs requires server_name or server_ip" >&2
+        exit 1
+    fi
+
+    san_entries=("DNS:localhost" "IP:127.0.0.1" "IP:::1")
+    if [[ "{{ server_name }}" != "" && "{{ server_name }}" != "localhost" ]]; then
+        san_entries+=("DNS:{{ server_name }}")
+    fi
+    if [[ "{{ server_ip }}" != "" && "{{ server_ip }}" != "127.0.0.1" && "{{ server_ip }}" != "::1" ]]; then
+        san_entries+=("IP:{{ server_ip }}")
+    fi
+    san_csv="$(IFS=,; printf '%s' "${san_entries[*]}")"
+
     openssl req -x509 -newkey rsa:2048 -nodes \
         -keyout {{ dir }}/ca.key \
         -out {{ dir }}/ca.pem \
@@ -194,8 +214,8 @@ generate-certs dir="certs" days="365":
     openssl req -new -newkey rsa:2048 -nodes \
         -keyout {{ dir }}/server.key.pem \
         -out {{ dir }}/server.csr \
-        -subj "/CN=localhost" \
-        -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1"
+        -subj "/CN=${cn}" \
+        -addext "subjectAltName=${san_csv}"
     openssl x509 -req \
         -in {{ dir }}/server.csr \
         -CA {{ dir }}/ca.pem \

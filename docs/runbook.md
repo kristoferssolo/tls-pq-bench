@@ -92,6 +92,14 @@ Generate a persistent CA and server certificate pair:
 just generate-certs
 ```
 
+For a two-machine run, generate the certificate for the DNS name or private IP
+the runner will verify:
+
+```bash
+just generate-certs certs 365 localhost 10.0.1.23
+just generate-certs certs 365 bench.example.com
+```
+
 Start the server with the generated certificate and key:
 
 ```bash
