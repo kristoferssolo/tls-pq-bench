@@ -40,153 +40,13 @@ server mode="x25519" proto="raw" listen="127.0.0.1:4433" cert="" key="": build
 
 # Start all eight server instances (4 modes × raw+http1)
 [group("run")]
-multi-server cert="" key="": build
-    #!/usr/bin/env bash
-    just _setup
-    pids=()
-    names=()
-
-    cert_args=()
-    if [[ "{{ cert }}" != "" || "{{ key }}" != "" ]]; then
-        if [[ "{{ cert }}" == "" || "{{ key }}" == "" ]]; then
-            echo "multi-server requires both cert and key, or neither" >&2
-            exit 1
-        fi
-        if [[ ! -f "{{ cert }}" ]]; then
-            echo "certificate file not found: {{ cert }}" >&2
-            exit 1
-        fi
-        if [[ ! -f "{{ key }}" ]]; then
-            echo "private key file not found: {{ key }}" >&2
-            exit 1
-        fi
-        cert_args=(--cert "{{ cert }}" --key "{{ key }}")
-    fi
-
-    cleanup() {
-        for pid in "${pids[@]}"; do
-            kill "$pid" 2>/dev/null || true
-        done
-        wait || true
-    }
-
-    trap cleanup EXIT INT TERM
-
-    echo "Starting benchmark servers:"
-    echo "    x25519 raw   -> 127.0.0.1:4433"
-    echo "    x25519 http1 -> 127.0.0.1:4434"
-    echo "    secp256r1 raw -> 127.0.0.1:4435"
-    echo "    secp256r1 http1 -> 127.0.0.1:4436"
-    echo "    x25519mlkem768 raw -> 127.0.0.1:4437"
-    echo "    x25519mlkem768 http1 -> 127.0.0.1:4438"
-    echo "    secp256r1mlkem768 raw -> 127.0.0.1:4439"
-    echo "    secp256r1mlkem768 http1 -> 127.0.0.1:4440"
-
-    LOG_FORMAT=compact {{ server }} --mode x25519            --proto raw   --listen 127.0.0.1:4433 "${cert_args[@]}" > {{ logs_dir }}/server-x25519-raw.log 2>&1              & pids+=($!); names+=("x25519 raw")
-    LOG_FORMAT=compact {{ server }} --mode x25519            --proto http1 --listen 127.0.0.1:4434 "${cert_args[@]}" > {{ logs_dir }}/server-x25519-http1.log 2>&1            & pids+=($!); names+=("x25519 http1")
-    LOG_FORMAT=compact {{ server }} --mode secp256r1         --proto raw   --listen 127.0.0.1:4435 "${cert_args[@]}" > {{ logs_dir }}/server-secp256r1-raw.log 2>&1           & pids+=($!); names+=("secp256r1 raw")
-    LOG_FORMAT=compact {{ server }} --mode secp256r1         --proto http1 --listen 127.0.0.1:4436 "${cert_args[@]}" > {{ logs_dir }}/server-secp256r1-http1.log 2>&1         & pids+=($!); names+=("secp256r1 http1")
-    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768    --proto raw   --listen 127.0.0.1:4437 "${cert_args[@]}" > {{ logs_dir }}/server-x25519mlkem768-raw.log 2>&1      & pids+=($!); names+=("x25519mlkem768 raw")
-    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768    --proto http1 --listen 127.0.0.1:4438 "${cert_args[@]}" > {{ logs_dir }}/server-x25519mlkem768-http1.log 2>&1    & pids+=($!); names+=("x25519mlkem768 http1")
-    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto raw   --listen 127.0.0.1:4439 "${cert_args[@]}" > {{ logs_dir }}/server-secp256r1mlkem768-raw.log 2>&1   & pids+=($!); names+=("secp256r1mlkem768 raw")
-    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto http1 --listen 127.0.0.1:4440 "${cert_args[@]}" > {{ logs_dir }}/server-secp256r1mlkem768-http1.log 2>&1 & pids+=($!); names+=("secp256r1mlkem768 http1")
-
-    sleep 1
-
-    for idx in "${!pids[@]}"; do
-        if ! kill -0 "${pids[$idx]}" 2>/dev/null; then
-            echo "server exited during startup: ${names[$idx]}" >&2
-            wait "${pids[$idx]}" || true
-            case "${names[$idx]}" in
-                "x25519 raw") log="{{ logs_dir }}/server-x25519-raw.log" ;;
-                "x25519 http1") log="{{ logs_dir }}/server-x25519-http1.log" ;;
-                "secp256r1 raw") log="{{ logs_dir }}/server-secp256r1-raw.log" ;;
-                "secp256r1 http1") log="{{ logs_dir }}/server-secp256r1-http1.log" ;;
-                "x25519mlkem768 raw") log="{{ logs_dir }}/server-x25519mlkem768-raw.log" ;;
-                "x25519mlkem768 http1") log="{{ logs_dir }}/server-x25519mlkem768-http1.log" ;;
-                "secp256r1mlkem768 raw") log="{{ logs_dir }}/server-secp256r1mlkem768-raw.log" ;;
-                "secp256r1mlkem768 http1") log="{{ logs_dir }}/server-secp256r1mlkem768-http1.log" ;;
-            esac
-            echo "--- ${log} ---" >&2
-            cat "${log}" >&2 || true
-            exit 1
-        fi
-    done
-
-    wait
+multi-server cert="" key="":
+    just _start-server-set multi-server 127.0.0.1 server "Starting benchmark servers:" "{{ cert }}" "{{ key }}"
 
 # Start the full production listener set on one server host. This covers all four key exchange variants, each exposed over raw and http1: 4433/4434 x25519, 4435/4436 secp256r1, 4437/4438 x25519mlkem768, 4439/4440 secp256r1mlkem768.
 [group("prod")]
-prod-server bind_host="0.0.0.0" cert="certs/server.der" key="certs/server.key": build
-    #!/usr/bin/env bash
-    just _setup
-    pids=()
-    names=()
-
-    if [[ "{{ cert }}" == "" || "{{ key }}" == "" ]]; then
-        echo "prod-server requires both cert and key" >&2
-        exit 1
-    fi
-    if [[ ! -f "{{ cert }}" ]]; then
-        echo "certificate file not found: {{ cert }}" >&2
-        exit 1
-    fi
-    if [[ ! -f "{{ key }}" ]]; then
-        echo "private key file not found: {{ key }}" >&2
-        exit 1
-    fi
-
-    cleanup() {
-        for pid in "${pids[@]}"; do
-            kill "$pid" 2>/dev/null || true
-        done
-        wait || true
-    }
-
-    trap cleanup EXIT INT TERM
-
-    echo "Starting production benchmark servers on {{ bind_host }}:"
-    echo "    x25519 raw              -> {{ bind_host }}:4433"
-    echo "    x25519 http1            -> {{ bind_host }}:4434"
-    echo "    secp256r1 raw           -> {{ bind_host }}:4435"
-    echo "    secp256r1 http1         -> {{ bind_host }}:4436"
-    echo "    x25519mlkem768 raw      -> {{ bind_host }}:4437"
-    echo "    x25519mlkem768 http1    -> {{ bind_host }}:4438"
-    echo "    secp256r1mlkem768 raw   -> {{ bind_host }}:4439"
-    echo "    secp256r1mlkem768 http1 -> {{ bind_host }}:4440"
-
-    LOG_FORMAT=compact {{ server }} --mode x25519            --proto raw   --listen {{ bind_host }}:4433 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-x25519-raw.log 2>&1              & pids+=($!); names+=("x25519 raw")
-    LOG_FORMAT=compact {{ server }} --mode x25519            --proto http1 --listen {{ bind_host }}:4434 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-x25519-http1.log 2>&1            & pids+=($!); names+=("x25519 http1")
-    LOG_FORMAT=compact {{ server }} --mode secp256r1         --proto raw   --listen {{ bind_host }}:4435 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-secp256r1-raw.log 2>&1           & pids+=($!); names+=("secp256r1 raw")
-    LOG_FORMAT=compact {{ server }} --mode secp256r1         --proto http1 --listen {{ bind_host }}:4436 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-secp256r1-http1.log 2>&1         & pids+=($!); names+=("secp256r1 http1")
-    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768    --proto raw   --listen {{ bind_host }}:4437 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-x25519mlkem768-raw.log 2>&1      & pids+=($!); names+=("x25519mlkem768 raw")
-    LOG_FORMAT=compact {{ server }} --mode x25519mlkem768    --proto http1 --listen {{ bind_host }}:4438 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-x25519mlkem768-http1.log 2>&1    & pids+=($!); names+=("x25519mlkem768 http1")
-    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto raw   --listen {{ bind_host }}:4439 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-secp256r1mlkem768-raw.log 2>&1   & pids+=($!); names+=("secp256r1mlkem768 raw")
-    LOG_FORMAT=compact {{ server }} --mode secp256r1mlkem768 --proto http1 --listen {{ bind_host }}:4440 --cert {{ cert }} --key {{ key }} > {{ logs_dir }}/prod-server-secp256r1mlkem768-http1.log 2>&1 & pids+=($!); names+=("secp256r1mlkem768 http1")
-
-    sleep 1
-
-    for idx in "${!pids[@]}"; do
-        if ! kill -0 "${pids[$idx]}" 2>/dev/null; then
-            echo "server exited during startup: ${names[$idx]}" >&2
-            wait "${pids[$idx]}" || true
-            case "${names[$idx]}" in
-                "x25519 raw") log="{{ logs_dir }}/prod-server-x25519-raw.log" ;;
-                "x25519 http1") log="{{ logs_dir }}/prod-server-x25519-http1.log" ;;
-                "secp256r1 raw") log="{{ logs_dir }}/prod-server-secp256r1-raw.log" ;;
-                "secp256r1 http1") log="{{ logs_dir }}/prod-server-secp256r1-http1.log" ;;
-                "x25519mlkem768 raw") log="{{ logs_dir }}/prod-server-x25519mlkem768-raw.log" ;;
-                "x25519mlkem768 http1") log="{{ logs_dir }}/prod-server-x25519mlkem768-http1.log" ;;
-                "secp256r1mlkem768 raw") log="{{ logs_dir }}/prod-server-secp256r1mlkem768-raw.log" ;;
-                "secp256r1mlkem768 http1") log="{{ logs_dir }}/prod-server-secp256r1mlkem768-http1.log" ;;
-            esac
-            echo "--- ${log} ---" >&2
-            cat "${log}" >&2 || true
-            exit 1
-        fi
-    done
-
-    wait
+prod-server bind_host="0.0.0.0" cert="" key="":
+    just _start-server-set prod-server "{{ bind_host }}" prod-server "Starting production benchmark servers on {{ bind_host }}:" "{{ cert }}" "{{ key }}"
 
 # Generate the scheduled remote benchmark configs and install/enable the systemd timers on the runner box. Expects an env file compatible with ops/scheduled-benchmarks.env.example.
 [group("prod")]
@@ -347,3 +207,72 @@ _bench server_addr proto mode out="" payload="1024" iters="200" warmup="20" conc
         --warmup        {{ warmup }} \
         --concurrency   {{ concurrency }} \
         {{ if out != "" { "> " + results_dir + "/" + out } else { "" } }}
+
+_start-server-set recipe_name bind_host log_prefix banner cert="" key="": build
+    #!/usr/bin/env bash
+    just _setup
+    pids=()
+    names=()
+    logs=()
+    specs=(
+        "x25519 raw 4433"
+        "x25519 http1 4434"
+        "secp256r1 raw 4435"
+        "secp256r1 http1 4436"
+        "x25519mlkem768 raw 4437"
+        "x25519mlkem768 http1 4438"
+        "secp256r1mlkem768 raw 4439"
+        "secp256r1mlkem768 http1 4440"
+    )
+
+    cert_args=()
+    if [[ "{{ cert }}" != "" || "{{ key }}" != "" ]]; then
+        if [[ "{{ cert }}" == "" || "{{ key }}" == "" ]]; then
+            echo "{{ recipe_name }} requires both cert and key, or neither" >&2
+            exit 1
+        fi
+        if [[ ! -f "{{ cert }}" ]]; then
+            echo "certificate file not found: {{ cert }}" >&2
+            exit 1
+        fi
+        if [[ ! -f "{{ key }}" ]]; then
+            echo "private key file not found: {{ key }}" >&2
+            exit 1
+        fi
+        cert_args=(--cert "{{ cert }}" --key "{{ key }}")
+    fi
+
+    cleanup() {
+        for pid in "${pids[@]}"; do
+            kill "$pid" 2>/dev/null || true
+        done
+        wait || true
+    }
+
+    trap cleanup EXIT INT TERM
+
+    echo "{{ banner }}"
+    for spec in "${specs[@]}"; do
+        read -r mode proto port <<< "$spec"
+        name="$mode $proto"
+        log="{{ logs_dir }}/{{ log_prefix }}-$mode-$proto.log"
+        echo "    $name -> {{ bind_host }}:$port"
+        LOG_FORMAT=compact {{ server }} --mode "$mode" --proto "$proto" --listen "{{ bind_host }}:$port" "${cert_args[@]}" > "$log" 2>&1 &
+        pids+=($!)
+        names+=("$name")
+        logs+=("$log")
+    done
+
+    sleep 1
+
+    for idx in "${!pids[@]}"; do
+        if ! kill -0 "${pids[$idx]}" 2>/dev/null; then
+            echo "server exited during startup: ${names[$idx]}" >&2
+            wait "${pids[$idx]}" || true
+            echo "--- ${logs[$idx]} ---" >&2
+            cat "${logs[$idx]}" >&2 || true
+            exit 1
+        fi
+    done
+
+    wait
