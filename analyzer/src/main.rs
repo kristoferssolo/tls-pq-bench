@@ -7,7 +7,11 @@ mod model;
 mod output;
 
 use crate::{
-    aggregate::aggregate_runs, args::Args, discovery::discover_runs, load::validate_runs,
+    aggregate::aggregate_runs,
+    args::{Args, ScheduleProfile},
+    compare::compare_aggregates,
+    discovery::discover_runs,
+    load::validate_runs,
     output::ensure_out_dir,
 };
 use clap::Parser;
@@ -26,10 +30,11 @@ fn main() -> miette::Result<()> {
     if validation.valid_runs.is_empty() {
         return Err(miette!("no valid benchmark runs remain after validation"));
     }
-    let _aggregates = aggregate_runs(
+    let aggregates = aggregate_runs(
         &validation.valid_runs,
-        args.profile.map(crate::args::ScheduleProfile::as_str),
+        args.profile.map(ScheduleProfile::as_str),
     );
+    let _ = compare_aggregates(&aggregates);
 
     Ok(())
 }

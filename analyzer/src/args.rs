@@ -1,5 +1,6 @@
-use clap::{Parser, ValueEnum};
+use clap::{ArgAction, Parser, ValueEnum};
 use std::path::PathBuf;
+use strum::Display;
 
 /// Weekly benchmark analyzer.
 #[derive(Debug, Parser)]
@@ -21,7 +22,7 @@ pub struct Args {
     pub strict: bool,
 
     /// Pretty-print generated JSON files.
-    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+    #[arg(long, default_value_t = true, action = ArgAction::Set)]
     pub pretty: bool,
 }
 
@@ -34,7 +35,8 @@ impl Args {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum ScheduleProfile {
     Lite,
     Full,

@@ -36,6 +36,7 @@ dependencies = [
  "miette",
  "serde",
  "serde_json",
+ "strum",
  "tempfile",
  "uuid",
 ]
