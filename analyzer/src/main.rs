@@ -6,7 +6,7 @@ mod load;
 mod model;
 mod output;
 
-use crate::{args::Args, discovery::discover_runs, output::ensure_out_dir};
+use crate::{args::Args, discovery::discover_runs, load::validate_runs, output::ensure_out_dir};
 use clap::Parser;
 use miette::{IntoDiagnostic, miette};
 
@@ -17,6 +17,11 @@ fn main() -> miette::Result<()> {
 
     if args.strict && !discovery.diagnostics.is_empty() {
         return Err(first_discovery_error(&discovery));
+    }
+
+    let validation = validate_runs(discovery.runs, args.strict)?;
+    if validation.valid_runs.is_empty() {
+        return Err(miette!("no valid benchmark runs remain after validation"));
     }
 
     Ok(())
