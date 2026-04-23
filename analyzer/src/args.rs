@@ -36,7 +36,7 @@ impl Args {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ScheduleProfile {
-    Track,
+    Lite,
     Full,
 }
 
@@ -63,14 +63,14 @@ mod tests {
             "--out-dir",
             "exports",
             "--profile",
-            "track",
+            "lite",
             "--strict",
             "--pretty",
             "false",
         ]);
 
         assert_eq!(args.out_dir(), PathBuf::from("exports"));
-        assert_eq!(args.profile, Some(ScheduleProfile::Track));
+        assert_eq!(args.profile, Some(ScheduleProfile::Lite));
         assert!(args.strict);
         assert!(!args.pretty);
     }

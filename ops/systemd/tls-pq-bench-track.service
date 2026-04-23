@@ -1,9 +1,0 @@
-[Unit]
-Description=TLS PQ recurring tracking benchmark run
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-EnvironmentFile=/etc/tls-pq-bench/scheduled.env
-ExecStart=/usr/bin/bash -lc '"$REPO_DIR/scripts/run_scheduled_benchmarks.sh" track'

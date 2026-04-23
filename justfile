@@ -78,10 +78,10 @@ prod-schedule env_file="/etc/tls-pq-bench/scheduled.env": build
     : "${SERVER_NAME:?set SERVER_NAME to the TLS DNS name or IP to verify}"
 
     CA_CERT="${CA_CERT:-certs/ca.der}"
-    TRACK_CONFIG="${TRACK_CONFIG:-$PWD/benchmarks/remote-recurring.toml}"
+    LITE_CONFIG="${LITE_CONFIG:-$PWD/benchmarks/remote-recurring.toml}"
     FULL_CONFIG="${FULL_CONFIG:-$PWD/benchmarks/remote-full.toml}"
-    TRACK_ITERS="${TRACK_ITERS:-200}"
-    TRACK_WARMUP="${TRACK_WARMUP:-20}"
+    LITE_ITERS="${LITE_ITERS:-200}"
+    LITE_WARMUP="${LITE_WARMUP:-20}"
     FULL_ITERS="${FULL_ITERS:-200}"
     FULL_WARMUP="${FULL_WARMUP:-20}"
 
@@ -90,9 +90,9 @@ prod-schedule env_file="/etc/tls-pq-bench/scheduled.env": build
         --host "${SERVER_HOST}" \
         --server-name "${SERVER_NAME}" \
         --ca-cert "${CA_CERT}" \
-        --iters "${TRACK_ITERS}" \
-        --warmup "${TRACK_WARMUP}" \
-        --output "${TRACK_CONFIG}"
+        --iters "${LITE_ITERS}" \
+        --warmup "${LITE_WARMUP}" \
+        --output "${LITE_CONFIG}"
 
     uv run --script scripts/generate_benchmark_matrix.py \
         --profile full \
@@ -103,12 +103,12 @@ prod-schedule env_file="/etc/tls-pq-bench/scheduled.env": build
         --warmup "${FULL_WARMUP}" \
         --output "${FULL_CONFIG}"
 
-    sudo install -m 0644 ops/systemd/tls-pq-bench-track.service /etc/systemd/system/tls-pq-bench-track.service
-    sudo install -m 0644 ops/systemd/tls-pq-bench-track.timer /etc/systemd/system/tls-pq-bench-track.timer
+    sudo install -m 0644 ops/systemd/tls-pq-bench-lite.service /etc/systemd/system/tls-pq-bench-lite.service
+    sudo install -m 0644 ops/systemd/tls-pq-bench-lite.timer /etc/systemd/system/tls-pq-bench-lite.timer
     sudo install -m 0644 ops/systemd/tls-pq-bench-full.service /etc/systemd/system/tls-pq-bench-full.service
     sudo install -m 0644 ops/systemd/tls-pq-bench-full.timer /etc/systemd/system/tls-pq-bench-full.timer
     sudo systemctl daemon-reload
-    sudo systemctl enable --now tls-pq-bench-track.timer
+    sudo systemctl enable --now tls-pq-bench-lite.timer
     sudo systemctl enable --now tls-pq-bench-full.timer
 
 
