@@ -1,5 +1,7 @@
-use crate::model::{DiscoveredRun, DiscoveryDiagnostics, DiscoveryReport, InvalidPairing};
-use miette::{Context, IntoDiagnostic};
+use crate::{
+    error::{Error, Result},
+    model::{DiscoveredRun, DiscoveryDiagnostics, DiscoveryReport, InvalidPairing},
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -7,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn discover_runs(results_dir: &Path) -> miette::Result<DiscoveryReport> {
+pub fn discover_runs(results_dir: &Path) -> Result<DiscoveryReport> {
     let mut result_files: BTreeMap<String, Vec<PathBuf>> = BTreeMap::new();
     let mut meta_files: BTreeMap<String, Vec<PathBuf>> = BTreeMap::new();
 
@@ -60,19 +62,21 @@ pub fn discover_runs(results_dir: &Path) -> miette::Result<DiscoveryReport> {
     Ok(report)
 }
 
-fn collect_files(root: &Path) -> miette::Result<Vec<PathBuf>> {
+fn collect_files(root: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     let mut stack = vec![root.to_path_buf()];
 
     while let Some(dir) = stack.pop() {
-        let entries = fs::read_dir(&dir)
-            .into_diagnostic()
-            .with_context(|| format!("failed to read results directory {}", dir.display()))?;
+        let entries = fs::read_dir(&dir).map_err(|source| Error::ReadDir {
+            path: dir.clone(),
+            source,
+        })?;
 
         for entry in entries {
-            let entry = entry
-                .into_diagnostic()
-                .with_context(|| format!("failed to read entry in {}", dir.display()))?;
+            let entry = entry.map_err(|source| Error::ReadDirEntry {
+                path: dir.clone(),
+                source,
+            })?;
             let path = entry.path();
             if path.is_dir() {
                 stack.push(path);

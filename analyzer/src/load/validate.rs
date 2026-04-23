@@ -1,105 +1,26 @@
 use crate::{
+    error::{Error, Result},
     load::{load_bench_records, load_run_metadata},
-    model::{DiscoveredRun, SkipReason, SkippedRun, ValidRun, ValidationReport},
+    model::{DiscoveredRun, RunMetadata, SkipReason, SkippedRun, ValidRun, ValidationReport},
 };
 use common::BenchRecord;
 
 pub fn validate_runs(
     discovered_runs: Vec<DiscoveredRun>,
     strict: bool,
-) -> miette::Result<ValidationReport> {
+) -> Result<ValidationReport> {
     let mut report = ValidationReport::default();
 
     for discovered in discovered_runs {
-        let metadata = match load_run_metadata(&discovered.meta_path) {
-            Ok(metadata) => metadata,
-            Err(error) => {
-                if strict {
-                    return Err(error);
-                }
-                report.skipped_runs.push(SkippedRun {
-                    discovered,
-                    reason: SkipReason::MetadataParseError {
-                        message: error.to_string(),
-                    },
-                });
-                continue;
-            }
+        let Some(metadata) = parse_metadata(&discovered, strict, &mut report)? else {
+            continue;
+        };
+        let Some(records) = parse_records(&discovered, strict, &mut report)? else {
+            continue;
         };
 
-        let records = match load_bench_records(&discovered.result_path) {
-            Ok(records) => records,
-            Err(error) => {
-                if strict {
-                    return Err(error);
-                }
-                report.skipped_runs.push(SkippedRun {
-                    discovered,
-                    reason: SkipReason::ResultParseError {
-                        message: error.to_string(),
-                    },
-                });
-                continue;
-            }
-        };
-
-        if metadata.status != "ok" {
-            if strict {
-                return Err(miette::miette!(
-                    "run {} is not successful: status={}",
-                    discovered.meta_path.display(),
-                    metadata.status
-                ));
-            }
-            report.skipped_runs.push(SkippedRun {
-                discovered,
-                reason: SkipReason::MetadataStatusError {
-                    status: metadata.status,
-                    error: metadata.error,
-                },
-            });
-            continue;
-        }
-
-        if records.is_empty() {
-            if strict {
-                return Err(miette::miette!(
-                    "result file {} contains no benchmark records",
-                    discovered.result_path.display()
-                ));
-            }
-            report.skipped_runs.push(SkippedRun {
-                discovered,
-                reason: SkipReason::EmptyResultFile,
-            });
-            continue;
-        }
-
-        if !all_records_share_run_id(&records) {
-            if strict {
-                return Err(miette::miette!(
-                    "result file {} contains multiple run_id values",
-                    discovered.result_path.display()
-                ));
-            }
-            report.skipped_runs.push(SkippedRun {
-                discovered,
-                reason: SkipReason::RunIdMismatch,
-            });
-            continue;
-        }
-
-        if !records_have_consistent_scenarios(&records) {
-            if strict {
-                return Err(miette::miette!(
-                    "result file {} contains inconsistent scenario rows",
-                    discovered.result_path.display()
-                ));
-            }
-            report.skipped_runs.push(SkippedRun {
-                discovered,
-                reason: SkipReason::ScenarioMismatch,
-            });
+        if let Some(reason) = validation_failure(&discovered, &metadata, &records, strict)? {
+            report.skipped_runs.push(SkippedRun { discovered, reason });
             continue;
         }
 
@@ -111,6 +32,119 @@ pub fn validate_runs(
     }
 
     Ok(report)
+}
+
+fn parse_metadata(
+    discovered: &DiscoveredRun,
+    strict: bool,
+    report: &mut ValidationReport,
+) -> Result<Option<RunMetadata>> {
+    match load_run_metadata(&discovered.meta_path) {
+        Ok(metadata) => Ok(Some(metadata)),
+        Err(error) => {
+            if strict {
+                return Err(error);
+            }
+            report.skipped_runs.push(SkippedRun {
+                discovered: discovered.clone(),
+                reason: SkipReason::MetadataParseError {
+                    message: error.to_string(),
+                },
+            });
+            Ok(None)
+        }
+    }
+}
+
+fn parse_records(
+    discovered: &DiscoveredRun,
+    strict: bool,
+    report: &mut ValidationReport,
+) -> Result<Option<Vec<BenchRecord>>> {
+    match load_bench_records(&discovered.result_path) {
+        Ok(records) => Ok(Some(records)),
+        Err(error) => {
+            if strict {
+                return Err(error);
+            }
+            report.skipped_runs.push(SkippedRun {
+                discovered: discovered.clone(),
+                reason: SkipReason::ResultParseError {
+                    message: error.to_string(),
+                },
+            });
+            Ok(None)
+        }
+    }
+}
+
+fn validation_failure(
+    discovered: &DiscoveredRun,
+    metadata: &RunMetadata,
+    records: &[BenchRecord],
+    strict: bool,
+) -> Result<Option<SkipReason>> {
+    if metadata.status != "ok" {
+        return non_strict_skip_or_error(
+            strict,
+            SkipReason::MetadataStatusError {
+                status: metadata.status.clone(),
+                error: metadata.error.clone(),
+            },
+            format!(
+                "run {} is not successful: status={}",
+                discovered.meta_path.display(),
+                metadata.status
+            ),
+        );
+    }
+
+    if records.is_empty() {
+        return non_strict_skip_or_error(
+            strict,
+            SkipReason::EmptyResultFile,
+            format!(
+                "result file {} contains no benchmark records",
+                discovered.result_path.display()
+            ),
+        );
+    }
+
+    if !all_records_share_run_id(records) {
+        return non_strict_skip_or_error(
+            strict,
+            SkipReason::RunIdMismatch,
+            format!(
+                "result file {} contains multiple run_id values",
+                discovered.result_path.display()
+            ),
+        );
+    }
+
+    if !records_have_consistent_scenarios(records) {
+        return non_strict_skip_or_error(
+            strict,
+            SkipReason::ScenarioMismatch,
+            format!(
+                "result file {} contains inconsistent scenario rows",
+                discovered.result_path.display()
+            ),
+        );
+    }
+
+    Ok(None)
+}
+
+fn non_strict_skip_or_error(
+    strict: bool,
+    reason: SkipReason,
+    message: String,
+) -> Result<Option<SkipReason>> {
+    if strict {
+        return Err(Error::StrictValidation { message });
+    }
+
+    Ok(Some(reason))
 }
 
 fn all_records_share_run_id(records: &[BenchRecord]) -> bool {
@@ -266,7 +300,7 @@ mod tests {
 
         let error = assert_err!(validate_runs(vec![discovered], true));
 
-        assert!(format!("{error:?}").contains("failed to parse metadata file"));
+        assert!(error.to_string().contains("failed to parse metadata file"));
     }
 
     fn write_discovered_run(

@@ -10,15 +10,15 @@ pub struct Args {
     pub results_dir: PathBuf,
 
     /// Directory for generated JSON artifacts.
-    #[arg(long)]
+    #[arg(short, long)]
     pub out_dir: Option<PathBuf>,
 
     /// Restrict analysis to a single schedule profile.
-    #[arg(long)]
+    #[arg(short, long)]
     pub profile: Option<ScheduleProfile>,
 
     /// Abort on the first invalid or missing artifact.
-    #[arg(long)]
+    #[arg(short, long)]
     pub strict: bool,
 
     /// Pretty-print generated JSON files.

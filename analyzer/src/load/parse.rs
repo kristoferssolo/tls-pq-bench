@@ -1,51 +1,55 @@
-use crate::model::RunMetadata;
+use crate::{
+    error::{Error, Result},
+    model::RunMetadata,
+};
 use common::BenchRecord;
-use miette::{Context, IntoDiagnostic};
 use std::{
     fs::File,
     io::{BufRead, BufReader},
     path::Path,
 };
 
-pub fn load_bench_records(path: &Path) -> miette::Result<Vec<BenchRecord>> {
-    let file = File::open(path)
-        .into_diagnostic()
-        .with_context(|| format!("failed to open result file {}", path.display()))?;
+pub fn load_bench_records(path: &Path) -> Result<Vec<BenchRecord>> {
+    let file = File::open(path).map_err(|source| Error::OpenResultFile {
+        path: path.to_path_buf(),
+        source,
+    })?;
     let reader = BufReader::new(file);
 
     let mut records = Vec::new();
     for (line_index, line) in reader.lines().enumerate() {
-        let line = line
-            .into_diagnostic()
-            .with_context(|| format!("failed to read result file {}", path.display()))?;
+        let line = line.map_err(|source| Error::ReadResultFile {
+            path: path.to_path_buf(),
+            source,
+        })?;
         let line = line.trim();
         if line.is_empty() {
             continue;
         }
 
-        let record = serde_json::from_str::<BenchRecord>(line)
-            .into_diagnostic()
-            .with_context(|| {
-                format!(
-                    "failed to parse JSONL record at {}:{}",
-                    path.display(),
-                    line_index + 1
-                )
-            })?;
+        let record = serde_json::from_str::<BenchRecord>(line).map_err(|source| {
+            Error::ParseJsonlRecord {
+                path: path.to_path_buf(),
+                line: line_index + 1,
+                source,
+            }
+        })?;
         records.push(record);
     }
 
     Ok(records)
 }
 
-pub fn load_run_metadata(path: &Path) -> miette::Result<RunMetadata> {
-    let file = File::open(path)
-        .into_diagnostic()
-        .with_context(|| format!("failed to open metadata file {}", path.display()))?;
+pub fn load_run_metadata(path: &Path) -> Result<RunMetadata> {
+    let file = File::open(path).map_err(|source| Error::OpenMetadataFile {
+        path: path.to_path_buf(),
+        source,
+    })?;
 
-    serde_json::from_reader(BufReader::new(file))
-        .into_diagnostic()
-        .with_context(|| format!("failed to parse metadata file {}", path.display()))
+    serde_json::from_reader(BufReader::new(file)).map_err(|source| Error::ParseMetadataFile {
+        path: path.to_path_buf(),
+        source,
+    })
 }
 
 #[cfg(test)]
@@ -92,7 +96,7 @@ mod tests {
 
         let error = assert_err!(load_bench_records(&path), "records should fail");
 
-        assert!(format!("{error:?}").contains("failed to parse JSONL record"));
+        assert!(error.to_string().contains("failed to parse JSONL record"));
     }
 
     #[test]
@@ -158,6 +162,6 @@ mod tests {
 
         let error = assert_err!(load_run_metadata(&path), "metadata should fail");
 
-        assert!(format!("{error:?}").contains("failed to parse metadata file"));
+        assert!(error.to_string().contains("failed to parse metadata file"));
     }
 }

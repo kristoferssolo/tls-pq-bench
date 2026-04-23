@@ -2,6 +2,7 @@ mod aggregate;
 mod args;
 mod compare;
 mod discovery;
+mod error;
 mod load;
 mod model;
 mod output;
@@ -11,15 +12,15 @@ use crate::{
     args::{Args, ScheduleProfile},
     compare::compare_aggregates,
     discovery::discover_runs,
+    error::{Error, Result},
     load::validate_runs,
     output::ensure_out_dir,
 };
 use clap::Parser;
-use miette::{IntoDiagnostic, miette};
 
-fn main() -> miette::Result<()> {
+fn main() -> Result<()> {
     let args = Args::parse();
-    ensure_out_dir(&args.out_dir()).into_diagnostic()?;
+    ensure_out_dir(&args.out_dir())?;
     let discovery = discover_runs(&args.results_dir)?;
 
     if args.strict && !discovery.diagnostics.is_empty() {
@@ -28,7 +29,7 @@ fn main() -> miette::Result<()> {
 
     let validation = validate_runs(discovery.runs, args.strict)?;
     if validation.valid_runs.is_empty() {
-        return Err(miette!("no valid benchmark runs remain after validation"));
+        return Err(Error::NoValidRuns);
     }
     let aggregates = aggregate_runs(
         &validation.valid_runs,
@@ -39,16 +40,24 @@ fn main() -> miette::Result<()> {
     Ok(())
 }
 
-fn first_discovery_error(discovery: &model::DiscoveryReport) -> miette::Error {
+fn first_discovery_error(discovery: &model::DiscoveryReport) -> Error {
     if let Some(path) = discovery.diagnostics.unmatched_results.first() {
-        return miette!("missing metadata for result file {}", path.display());
+        return Error::StrictDiscovery {
+            message: format!("missing metadata for result file {}", path.display()),
+        };
     }
     if let Some(path) = discovery.diagnostics.unmatched_meta.first() {
-        return miette!("missing result file for metadata {}", path.display());
+        return Error::StrictDiscovery {
+            message: format!("missing result file for metadata {}", path.display()),
+        };
     }
     if let Some(invalid) = discovery.diagnostics.invalid_pairings.first() {
-        return miette!("ambiguous pairing for stem {}", invalid.stem);
+        return Error::StrictDiscovery {
+            message: format!("ambiguous pairing for stem {}", invalid.stem),
+        };
     }
 
-    miette!("unknown discovery failure")
+    Error::StrictDiscovery {
+        message: "unknown discovery failure".to_string(),
+    }
 }
