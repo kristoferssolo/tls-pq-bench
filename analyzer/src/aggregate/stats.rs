@@ -5,16 +5,30 @@ use common::BenchRecord;
 use std::collections::BTreeMap;
 
 pub fn aggregate_runs(valid_runs: &[ValidRun], profile_filter: Option<&str>) -> AggregateReport {
-    let mut buckets: BTreeMap<ScenarioKey, Vec<&ValidRun>> = BTreeMap::new();
+    let mut buckets: BTreeMap<ScenarioKey, Vec<ScenarioRun<'_>>> = BTreeMap::new();
 
     for run in valid_runs {
-        let Some(key) = ScenarioKey::from_run(run) else {
-            continue;
-        };
-        if profile_filter.is_some_and(|filter| filter != key.schedule_profile) {
+        let schedule_profile = run
+            .metadata
+            .schedule_profile
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string());
+        if profile_filter.is_some_and(|filter| filter != schedule_profile) {
             continue;
         }
-        buckets.entry(key).or_default().push(run);
+
+        let mut run_buckets: BTreeMap<ScenarioKey, Vec<&BenchRecord>> = BTreeMap::new();
+        for record in &run.records {
+            let key = ScenarioKey::from_record(schedule_profile.clone(), record);
+            run_buckets.entry(key).or_default().push(record);
+        }
+
+        for (key, records) in run_buckets {
+            buckets
+                .entry(key)
+                .or_default()
+                .push(ScenarioRun { run, records });
+        }
     }
 
     let scenarios = buckets
@@ -25,7 +39,12 @@ pub fn aggregate_runs(valid_runs: &[ValidRun], profile_filter: Option<&str>) -> 
     AggregateReport { scenarios }
 }
 
-fn aggregate_bucket(key: ScenarioKey, runs: &[&ValidRun]) -> ScenarioAggregate {
+struct ScenarioRun<'a> {
+    run: &'a ValidRun,
+    records: Vec<&'a BenchRecord>,
+}
+
+fn aggregate_bucket(key: ScenarioKey, runs: &[ScenarioRun<'_>]) -> ScenarioAggregate {
     let tcp_values = collect_metric(runs, |record| record.tcp_ns);
     let handshake_values = collect_metric(runs, |record| record.handshake_ns);
     let ttlb_values = collect_metric(runs, |record| record.ttlb_ns);
@@ -35,14 +54,17 @@ fn aggregate_bucket(key: ScenarioKey, runs: &[&ValidRun]) -> ScenarioAggregate {
         tcp: summarize_metric(&tcp_values, runs.len()),
         handshake: summarize_metric(&handshake_values, runs.len()),
         ttlb: summarize_metric(&ttlb_values, runs.len()),
-        provenance: runs.iter().copied().map(RunProvenance::from).collect(),
+        provenance: runs
+            .iter()
+            .map(|run| RunProvenance::from(run.run))
+            .collect(),
     }
 }
 
-fn collect_metric(runs: &[&ValidRun], selector: impl Fn(&BenchRecord) -> u128) -> Vec<u128> {
+fn collect_metric(runs: &[ScenarioRun<'_>], selector: impl Fn(&BenchRecord) -> u128) -> Vec<u128> {
     let mut values = runs
         .iter()
-        .flat_map(|run| run.records.iter().map(&selector))
+        .flat_map(|run| run.records.iter().copied().map(&selector))
         .collect::<Vec<_>>();
     values.sort_unstable();
     values
@@ -93,15 +115,53 @@ mod tests {
             valid_run(
                 "00000000-0000-0000-0000-000000000001",
                 "lite",
-                KeyExchangeMode::X25519,
-                &[(10, 20, 30), (11, 21, 31)],
+                &[
+                    (
+                        ProtocolMode::Raw,
+                        KeyExchangeMode::X25519,
+                        1024,
+                        1,
+                        10,
+                        20,
+                        30,
+                    ),
+                    (
+                        ProtocolMode::Raw,
+                        KeyExchangeMode::X25519,
+                        1024,
+                        1,
+                        11,
+                        21,
+                        31,
+                    ),
+                ],
+                &[],
                 "/tmp/lite-a.jsonl",
             ),
             valid_run(
                 "00000000-0000-0000-0000-000000000002",
                 "lite",
-                KeyExchangeMode::X25519,
-                &[(12, 22, 32), (13, 23, 33)],
+                &[
+                    (
+                        ProtocolMode::Raw,
+                        KeyExchangeMode::X25519,
+                        1024,
+                        1,
+                        12,
+                        22,
+                        32,
+                    ),
+                    (
+                        ProtocolMode::Raw,
+                        KeyExchangeMode::X25519,
+                        1024,
+                        1,
+                        13,
+                        23,
+                        33,
+                    ),
+                ],
+                &[],
                 "/tmp/lite-b.jsonl",
             ),
         ];
@@ -124,15 +184,31 @@ mod tests {
             valid_run(
                 "00000000-0000-0000-0000-000000000001",
                 "lite",
-                KeyExchangeMode::X25519,
-                &[(10, 20, 30)],
+                &[(
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    10,
+                    20,
+                    30,
+                )],
+                &[],
                 "/tmp/lite.jsonl",
             ),
             valid_run(
                 "00000000-0000-0000-0000-000000000002",
                 "full",
-                KeyExchangeMode::X25519,
-                &[(11, 21, 31)],
+                &[(
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    11,
+                    21,
+                    31,
+                )],
+                &[],
                 "/tmp/full.jsonl",
             ),
         ];
@@ -157,15 +233,31 @@ mod tests {
             valid_run(
                 "00000000-0000-0000-0000-000000000001",
                 "lite",
-                KeyExchangeMode::X25519,
-                &[(10, 20, 30)],
+                &[(
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    10,
+                    20,
+                    30,
+                )],
+                &[],
                 "/tmp/lite.jsonl",
             ),
             valid_run(
                 "00000000-0000-0000-0000-000000000002",
                 "full",
-                KeyExchangeMode::X25519,
-                &[(11, 21, 31)],
+                &[(
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    11,
+                    21,
+                    31,
+                )],
+                &[],
                 "/tmp/full.jsonl",
             ),
         ];
@@ -181,13 +273,52 @@ mod tests {
         let runs = vec![valid_run(
             "00000000-0000-0000-0000-000000000001",
             "lite",
-            KeyExchangeMode::X25519,
+            &[(
+                ProtocolMode::Raw,
+                KeyExchangeMode::X25519,
+                1024,
+                1,
+                1,
+                10,
+                100,
+            )],
             &[
-                (1, 10, 100),
-                (2, 20, 200),
-                (3, 30, 300),
-                (4, 40, 400),
-                (5, 50, 500),
+                (
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    2,
+                    20,
+                    200,
+                ),
+                (
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    3,
+                    30,
+                    300,
+                ),
+                (
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    4,
+                    40,
+                    400,
+                ),
+                (
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    5,
+                    50,
+                    500,
+                ),
             ],
             "/tmp/lite.jsonl",
         )];
@@ -200,15 +331,76 @@ mod tests {
         assert_eq!(scenario.tcp.p99, 5);
     }
 
+    #[test]
+    fn aggregates_multiple_scenarios_from_one_run() {
+        let runs = vec![valid_run(
+            "00000000-0000-0000-0000-000000000001",
+            "lite",
+            &[
+                (
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    10,
+                    20,
+                    30,
+                ),
+                (
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519Mlkem768,
+                    1024,
+                    1,
+                    11,
+                    21,
+                    31,
+                ),
+            ],
+            &[
+                (
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    12,
+                    22,
+                    32,
+                ),
+                (
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519Mlkem768,
+                    1024,
+                    1,
+                    13,
+                    23,
+                    33,
+                ),
+            ],
+            "/tmp/lite.jsonl",
+        )];
+
+        let report = aggregate_runs(&runs, None);
+
+        assert_eq!(report.scenarios.len(), 2);
+        assert_eq!(report.scenarios[0].tcp.sample_count, 2);
+        assert_eq!(report.scenarios[1].tcp.sample_count, 2);
+        assert_eq!(report.scenarios[0].tcp.run_count, 1);
+        assert_eq!(report.scenarios[1].tcp.run_count, 1);
+    }
+
     fn valid_run(
         run_id: &str,
         schedule_profile: &str,
-        mode: KeyExchangeMode,
-        samples: &[(u128, u128, u128)],
+        benchmarks: &[(ProtocolMode, KeyExchangeMode, u32, u32, u128, u128, u128)],
+        extra_samples: &[(ProtocolMode, KeyExchangeMode, u32, u32, u128, u128, u128)],
         result_path: &str,
     ) -> ValidRun {
         let run_id = Uuid::parse_str(run_id).expect("valid uuid");
-        let sample_count = u32::try_from(samples.len()).expect("sample count should fit in u32");
+        let samples = benchmarks
+            .iter()
+            .chain(extra_samples.iter())
+            .copied()
+            .collect::<Vec<_>>();
         ValidRun {
             discovered: DiscoveredRun {
                 stem: format!("{schedule_profile}-{run_id}"),
@@ -239,31 +431,41 @@ mod tests {
                 server_instance_type: None,
                 server_region: None,
                 server_availability_zone: None,
-                benchmarks: vec![BenchmarkMetadata {
-                    server: "127.0.0.1:4433".to_string(),
-                    server_name: "localhost".to_string(),
-                    proto: ProtocolMode::Raw,
-                    mode,
-                    verification: VerificationMode::Insecure,
-                    payload: 1024,
-                    iters: sample_count,
-                    warmup: 1,
-                    concurrency: 1,
-                    timeout_secs: 30,
-                }],
+                benchmarks: samples
+                    .iter()
+                    .map(
+                        |&(proto, mode, payload, concurrency, ..)| BenchmarkMetadata {
+                            server: "127.0.0.1:4433".to_string(),
+                            server_name: "localhost".to_string(),
+                            proto,
+                            mode,
+                            verification: VerificationMode::Insecure,
+                            payload,
+                            iters: u32::try_from(samples.len())
+                                .expect("sample count should fit in u32"),
+                            warmup: 1,
+                            concurrency,
+                            timeout_secs: 30,
+                        },
+                    )
+                    .collect(),
             },
             records: samples
                 .iter()
                 .enumerate()
                 .map(
-                    |(iteration, &(tcp_ns, handshake_ns, ttlb_ns))| BenchRecord {
+                    |(
+                        iteration,
+                        &(proto, mode, payload_bytes, concurrency, tcp_ns, handshake_ns, ttlb_ns),
+                    )| BenchRecord {
                         run_id,
                         iteration: u32::try_from(iteration).expect("iteration should fit in u32"),
-                        proto: ProtocolMode::Raw,
+                        proto,
                         mode,
-                        payload_bytes: 1024,
-                        concurrency: 1,
-                        iters: sample_count,
+                        payload_bytes,
+                        concurrency,
+                        iters: u32::try_from(samples.len())
+                            .expect("sample count should fit in u32"),
                         warmup: 1,
                         tcp_ns,
                         handshake_ns,

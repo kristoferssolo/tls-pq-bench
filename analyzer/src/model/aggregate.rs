@@ -2,7 +2,7 @@ use crate::model::{
     ValidRun,
     ordering::{mode_order, proto_order},
 };
-use common::{KeyExchangeMode, ProtocolMode};
+use common::{BenchRecord, KeyExchangeMode, ProtocolMode};
 use std::cmp::Ordering;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -18,20 +18,14 @@ pub struct ScenarioKey {
 
 impl ScenarioKey {
     #[must_use]
-    pub fn from_run(run: &ValidRun) -> Option<Self> {
-        let first = run.records.first()?;
-
-        Some(Self {
-            schedule_profile: run
-                .metadata
-                .schedule_profile
-                .clone()
-                .unwrap_or_else(|| "unknown".to_string()),
-            proto: first.proto,
-            mode: first.mode,
-            payload_bytes: first.payload_bytes,
-            concurrency: first.concurrency,
-        })
+    pub const fn from_record(schedule_profile: String, record: &BenchRecord) -> Self {
+        Self {
+            schedule_profile,
+            proto: record.proto,
+            mode: record.mode,
+            payload_bytes: record.payload_bytes,
+            concurrency: record.concurrency,
+        }
     }
 }
 
