@@ -212,9 +212,7 @@ fn parse_f64(value: &impl ToString) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{
-        ComparisonFamily, MetricSummary, RunProvenance, ScenarioAggregate, ScenarioKey,
-    };
+    use crate::model::{AggregateReport, RunProvenance, ScenarioAggregate, ScenarioKey};
     use common::ProtocolMode;
     use uuid::Uuid;
 
