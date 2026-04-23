@@ -2,7 +2,6 @@ use crate::model::{
     AggregateReport, ComparisonContext, ComparisonFamily, ComparisonReport, ComparisonWarning,
     Delta, MetricComparison, MetricSummary, PairwiseComparison, ScenarioAggregate,
 };
-use common::KeyExchangeMode;
 use std::collections::BTreeMap;
 
 pub fn compare_aggregates(aggregates: &AggregateReport) -> ComparisonReport {
@@ -10,19 +9,14 @@ pub fn compare_aggregates(aggregates: &AggregateReport) -> ComparisonReport {
         BTreeMap::<(ComparisonFamily, ComparisonContext), Vec<&ScenarioAggregate>>::new();
 
     for scenario in &aggregates.scenarios {
-        let family = comparison_family(scenario.key.mode);
-        let context = ComparisonContext {
-            schedule_profile: scenario.key.schedule_profile.clone(),
-            proto: scenario.key.proto,
-            payload_bytes: scenario.key.payload_bytes,
-            concurrency: scenario.key.concurrency,
-        };
+        let family = ComparisonFamily::from_mode(scenario.key.mode);
+        let context = ComparisonContext::from(&scenario.key);
         grouped.entry((family, context)).or_default().push(scenario);
     }
 
     let mut report = ComparisonReport::default();
     for ((family, context), scenarios) in grouped {
-        let (classical_mode, pq_mode) = family_modes(family);
+        let (classical_mode, pq_mode) = family.modes();
         let classical = scenarios
             .iter()
             .find(|scenario| scenario.key.mode == classical_mode);
@@ -71,25 +65,6 @@ pub fn compare_aggregates(aggregates: &AggregateReport) -> ComparisonReport {
     report
 }
 
-const fn comparison_family(mode: KeyExchangeMode) -> ComparisonFamily {
-    match mode {
-        KeyExchangeMode::X25519 | KeyExchangeMode::X25519Mlkem768 => ComparisonFamily::X25519,
-        KeyExchangeMode::Secp256r1 | KeyExchangeMode::Secp256r1Mlkem768 => {
-            ComparisonFamily::Secp256r1
-        }
-    }
-}
-
-const fn family_modes(family: ComparisonFamily) -> (KeyExchangeMode, KeyExchangeMode) {
-    match family {
-        ComparisonFamily::X25519 => (KeyExchangeMode::X25519, KeyExchangeMode::X25519Mlkem768),
-        ComparisonFamily::Secp256r1 => (
-            KeyExchangeMode::Secp256r1,
-            KeyExchangeMode::Secp256r1Mlkem768,
-        ),
-    }
-}
-
 fn compare_metric(
     classical: &MetricSummary,
     pq: &MetricSummary,
@@ -101,7 +76,7 @@ fn compare_metric(
     MetricComparison {
         classical: classical.clone(),
         pq: pq.clone(),
-        mean: float_delta(
+        mean: delta_for(
             classical.mean,
             pq.mean,
             family,
@@ -110,7 +85,7 @@ fn compare_metric(
             "mean",
             warnings,
         ),
-        p50: integer_delta(
+        p50: delta_for(
             classical.p50,
             pq.p50,
             family,
@@ -119,7 +94,7 @@ fn compare_metric(
             "p50",
             warnings,
         ),
-        p90: integer_delta(
+        p90: delta_for(
             classical.p90,
             pq.p90,
             family,
@@ -128,7 +103,7 @@ fn compare_metric(
             "p90",
             warnings,
         ),
-        p99: integer_delta(
+        p99: delta_for(
             classical.p99,
             pq.p99,
             family,
@@ -140,37 +115,23 @@ fn compare_metric(
     }
 }
 
-fn float_delta(
-    classical: f64,
-    pq: f64,
+fn delta_for<T>(
+    classical: T,
+    pq: T,
     family: ComparisonFamily,
     context: &ComparisonContext,
     metric: &'static str,
     field: &'static str,
     warnings: &mut Vec<ComparisonWarning>,
-) -> Delta<f64> {
+) -> Delta<T::Absolute>
+where
+    T: DeltaValue,
+{
     Delta {
-        absolute: pq - classical,
-        relative: relative_delta(classical, pq, family, context, metric, field, warnings),
-    }
-}
-
-fn integer_delta(
-    classical: u128,
-    pq: u128,
-    family: ComparisonFamily,
-    context: &ComparisonContext,
-    metric: &'static str,
-    field: &'static str,
-    warnings: &mut Vec<ComparisonWarning>,
-) -> Delta<i128> {
-    let classical_i128 = i128::try_from(classical).expect("metric values should fit in i128");
-    let pq_i128 = i128::try_from(pq).expect("metric values should fit in i128");
-    Delta {
-        absolute: pq_i128 - classical_i128,
+        absolute: classical.absolute_delta(pq),
         relative: relative_delta(
-            parse_f64(&classical),
-            parse_f64(&pq),
+            classical.as_f64(),
+            pq.as_f64(),
             family,
             context,
             metric,
@@ -202,18 +163,46 @@ fn relative_delta(
     Some((pq - classical) / classical)
 }
 
-fn parse_f64(value: &impl ToString) -> f64 {
-    value
-        .to_string()
-        .parse::<f64>()
-        .expect("numeric values should parse as f64")
+trait DeltaValue: Copy {
+    type Absolute;
+
+    fn absolute_delta(self, other: Self) -> Self::Absolute;
+    fn as_f64(self) -> f64;
+}
+
+impl DeltaValue for f64 {
+    type Absolute = Self;
+
+    fn absolute_delta(self, other: Self) -> Self::Absolute {
+        other - self
+    }
+
+    fn as_f64(self) -> f64 {
+        self
+    }
+}
+
+impl DeltaValue for u128 {
+    type Absolute = i128;
+
+    fn absolute_delta(self, other: Self) -> Self::Absolute {
+        let left = i128::try_from(self).expect("metric values should fit in i128");
+        let right = i128::try_from(other).expect("metric values should fit in i128");
+        right - left
+    }
+
+    fn as_f64(self) -> f64 {
+        self.to_string()
+            .parse::<f64>()
+            .expect("numeric values should parse as f64")
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::{AggregateReport, RunProvenance, ScenarioAggregate, ScenarioKey};
-    use common::ProtocolMode;
+    use common::{KeyExchangeMode, ProtocolMode};
     use uuid::Uuid;
 
     #[test]

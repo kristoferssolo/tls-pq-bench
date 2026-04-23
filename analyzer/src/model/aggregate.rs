@@ -1,4 +1,7 @@
-use crate::model::ordering::{mode_order, proto_order};
+use crate::model::{
+    ValidRun,
+    ordering::{mode_order, proto_order},
+};
 use common::{KeyExchangeMode, ProtocolMode};
 use std::cmp::Ordering;
 use std::path::PathBuf;
@@ -11,6 +14,25 @@ pub struct ScenarioKey {
     pub mode: KeyExchangeMode,
     pub payload_bytes: u32,
     pub concurrency: u32,
+}
+
+impl ScenarioKey {
+    #[must_use]
+    pub fn from_run(run: &ValidRun) -> Option<Self> {
+        let first = run.records.first()?;
+
+        Some(Self {
+            schedule_profile: run
+                .metadata
+                .schedule_profile
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string()),
+            proto: first.proto,
+            mode: first.mode,
+            payload_bytes: first.payload_bytes,
+            concurrency: first.concurrency,
+        })
+    }
 }
 
 impl Ord for ScenarioKey {
@@ -60,6 +82,21 @@ pub struct RunProvenance {
     pub runner_host: Option<String>,
     pub server_git_commit: Option<String>,
     pub server_host: Option<String>,
+}
+
+impl From<&ValidRun> for RunProvenance {
+    fn from(run: &ValidRun) -> Self {
+        Self {
+            run_id: run.metadata.run_id,
+            result_path: run.discovered.result_path.clone(),
+            started_at_unix_ms: run.metadata.started_at_unix_ms,
+            finished_at_unix_ms: run.metadata.finished_at_unix_ms,
+            runner_git_commit: run.metadata.runner_git_commit.clone(),
+            runner_host: run.metadata.runner_host.clone(),
+            server_git_commit: run.metadata.server_git_commit.clone(),
+            server_host: run.metadata.server_host.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,4 +1,4 @@
-use crate::model::{MetricSummary, ordering::proto_order};
+use crate::model::{MetricSummary, ScenarioKey, ordering::proto_order};
 use common::{KeyExchangeMode, ProtocolMode};
 use std::cmp::Ordering;
 
@@ -8,6 +8,17 @@ pub struct ComparisonContext {
     pub proto: ProtocolMode,
     pub payload_bytes: u32,
     pub concurrency: u32,
+}
+
+impl From<&ScenarioKey> for ComparisonContext {
+    fn from(key: &ScenarioKey) -> Self {
+        Self {
+            schedule_profile: key.schedule_profile.clone(),
+            proto: key.proto,
+            payload_bytes: key.payload_bytes,
+            concurrency: key.concurrency,
+        }
+    }
 }
 
 impl Ord for ComparisonContext {
@@ -37,6 +48,27 @@ impl PartialOrd for ComparisonContext {
 pub enum ComparisonFamily {
     X25519,
     Secp256r1,
+}
+
+impl ComparisonFamily {
+    #[must_use]
+    pub const fn from_mode(mode: KeyExchangeMode) -> Self {
+        match mode {
+            KeyExchangeMode::X25519 | KeyExchangeMode::X25519Mlkem768 => Self::X25519,
+            KeyExchangeMode::Secp256r1 | KeyExchangeMode::Secp256r1Mlkem768 => Self::Secp256r1,
+        }
+    }
+
+    #[must_use]
+    pub const fn modes(self) -> (KeyExchangeMode, KeyExchangeMode) {
+        match self {
+            Self::X25519 => (KeyExchangeMode::X25519, KeyExchangeMode::X25519Mlkem768),
+            Self::Secp256r1 => (
+                KeyExchangeMode::Secp256r1,
+                KeyExchangeMode::Secp256r1Mlkem768,
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

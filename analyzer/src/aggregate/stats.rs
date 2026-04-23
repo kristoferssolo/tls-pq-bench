@@ -8,26 +8,12 @@ pub fn aggregate_runs(valid_runs: &[ValidRun], profile_filter: Option<&str>) -> 
     let mut buckets: BTreeMap<ScenarioKey, Vec<&ValidRun>> = BTreeMap::new();
 
     for run in valid_runs {
-        let Some(first) = run.records.first() else {
+        let Some(key) = ScenarioKey::from_run(run) else {
             continue;
         };
-
-        let schedule_profile = run
-            .metadata
-            .schedule_profile
-            .clone()
-            .unwrap_or_else(|| "unknown".to_string());
-        if profile_filter.is_some_and(|filter| filter != schedule_profile) {
+        if profile_filter.is_some_and(|filter| filter != key.schedule_profile) {
             continue;
         }
-
-        let key = ScenarioKey {
-            schedule_profile,
-            proto: first.proto,
-            mode: first.mode,
-            payload_bytes: first.payload_bytes,
-            concurrency: first.concurrency,
-        };
         buckets.entry(key).or_default().push(run);
     }
 
@@ -49,7 +35,7 @@ fn aggregate_bucket(key: ScenarioKey, runs: &[&ValidRun]) -> ScenarioAggregate {
         tcp: summarize_metric(&tcp_values, runs.len()),
         handshake: summarize_metric(&handshake_values, runs.len()),
         ttlb: summarize_metric(&ttlb_values, runs.len()),
-        provenance: runs.iter().map(|run| run_provenance(run)).collect(),
+        provenance: runs.iter().copied().map(RunProvenance::from).collect(),
     }
 }
 
@@ -91,19 +77,6 @@ fn parse_f64(value: &impl ToString) -> f64 {
         .to_string()
         .parse::<f64>()
         .expect("numeric values should parse as f64")
-}
-
-fn run_provenance(run: &ValidRun) -> RunProvenance {
-    RunProvenance {
-        run_id: run.metadata.run_id,
-        result_path: run.discovered.result_path.clone(),
-        started_at_unix_ms: run.metadata.started_at_unix_ms,
-        finished_at_unix_ms: run.metadata.finished_at_unix_ms,
-        runner_git_commit: run.metadata.runner_git_commit.clone(),
-        runner_host: run.metadata.runner_host.clone(),
-        server_git_commit: run.metadata.server_git_commit.clone(),
-        server_host: run.metadata.server_host.clone(),
-    }
 }
 
 #[cfg(test)]
