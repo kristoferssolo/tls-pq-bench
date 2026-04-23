@@ -102,6 +102,7 @@ fn file_stem_string(path: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use claims::assert_ok;
     use std::{
         fs,
         path::{Path, PathBuf},
@@ -115,7 +116,7 @@ mod tests {
         dir.write("lite-20260424T010000Z.meta", "{}");
         dir.write("ignore.txt", "ignored");
 
-        let report = discover_runs(dir.path()).expect("discovery should succeed");
+        let report = assert_ok!(discover_runs(dir.path()), "discovery should succeed");
 
         assert_eq!(report.runs.len(), 1);
         assert_eq!(report.runs[0].stem, "lite-20260424T010000Z");
@@ -128,7 +129,7 @@ mod tests {
         let result_path = dir.write("lite-run.jsonl", "");
         let meta_path = dir.write("full-run.meta", "{}");
 
-        let report = discover_runs(dir.path()).expect("discovery should succeed");
+        let report = assert_ok!(discover_runs(dir.path()), "discovery should succeed");
 
         assert!(report.runs.is_empty());
         assert_eq!(report.diagnostics.unmatched_results, vec![result_path]);
@@ -144,7 +145,7 @@ mod tests {
         fs::write(nested.join("lite-run.meta"), "{}").expect("nested meta should be written");
         fs::write(dir.path().join("lite-run.meta"), "{}").expect("root meta should be written");
 
-        let report = discover_runs(dir.path()).expect("discovery should succeed");
+        let report = assert_ok!(discover_runs(dir.path()), "discovery should succeed");
 
         assert!(report.runs.is_empty());
         assert_eq!(report.diagnostics.invalid_pairings.len(), 1);
