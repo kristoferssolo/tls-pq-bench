@@ -1,0 +1,77 @@
+use clap::{Parser, ValueEnum};
+use std::path::PathBuf;
+
+/// Weekly benchmark analyzer.
+#[derive(Debug, Parser)]
+#[command(name = "analyzer", version, about)]
+pub struct Args {
+    /// Directory containing scheduled benchmark artifacts.
+    pub results_dir: PathBuf,
+
+    /// Directory for generated JSON artifacts.
+    #[arg(long)]
+    pub out_dir: Option<PathBuf>,
+
+    /// Restrict analysis to a single schedule profile.
+    #[arg(long)]
+    pub profile: Option<ScheduleProfile>,
+
+    /// Abort on the first invalid or missing artifact.
+    #[arg(long)]
+    pub strict: bool,
+
+    /// Pretty-print generated JSON files.
+    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+    pub pretty: bool,
+}
+
+impl Args {
+    #[must_use]
+    pub fn out_dir(&self) -> PathBuf {
+        self.out_dir
+            .clone()
+            .unwrap_or_else(|| self.results_dir.join("analysis"))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ScheduleProfile {
+    Track,
+    Full,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defaults_output_directory_under_results_dir() {
+        let args = Args::parse_from(["analyzer", "weekly-results"]);
+
+        assert_eq!(args.results_dir, PathBuf::from("weekly-results"));
+        assert_eq!(args.out_dir(), PathBuf::from("weekly-results/analysis"));
+        assert!(!args.strict);
+        assert!(args.pretty);
+        assert_eq!(args.profile, None);
+    }
+
+    #[test]
+    fn accepts_explicit_options() {
+        let args = Args::parse_from([
+            "analyzer",
+            "weekly-results",
+            "--out-dir",
+            "exports",
+            "--profile",
+            "track",
+            "--strict",
+            "--pretty",
+            "false",
+        ]);
+
+        assert_eq!(args.out_dir(), PathBuf::from("exports"));
+        assert_eq!(args.profile, Some(ScheduleProfile::Track));
+        assert!(args.strict);
+        assert!(!args.pretty);
+    }
+}
