@@ -49,6 +49,7 @@ cargo-husky = { version = "1", default-features = false, features = [
 ] }
 claims = "0.8"
 rstest = "0.26"
+tempfile = "3.27"
 
 [workspace.lints.clippy]
 nursery = "warn"
