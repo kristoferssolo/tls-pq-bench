@@ -1,9 +1,10 @@
+use miette::Diagnostic;
 use std::path::PathBuf;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum Error {
     #[error("failed to create output directory {path}")]
     CreateOutDir {

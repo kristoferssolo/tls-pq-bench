@@ -12,12 +12,13 @@ use crate::{
     args::{Args, ScheduleProfile},
     compare::compare_aggregates,
     discovery::discover_runs,
-    error::{Error, Result},
+    error::Error,
     load::validate_runs,
     model::DiscoveryReport,
     output::{ensure_out_dir, write_artifacts},
 };
 use clap::Parser;
+use miette::Result;
 use std::mem;
 
 fn main() -> Result<()> {
@@ -26,12 +27,12 @@ fn main() -> Result<()> {
     let mut discovery = discover_runs(&args.results_dir)?;
 
     if args.strict && !discovery.diagnostics.is_empty() {
-        return Err(first_discovery_error(&discovery));
+        return Err(first_discovery_error(&discovery).into());
     }
 
     let validation = validate_runs(mem::take(&mut discovery.runs), args.strict)?;
     if validation.valid_runs.is_empty() {
-        return Err(Error::NoValidRuns);
+        return Err(Error::NoValidRuns.into());
     }
     let aggregates = aggregate_runs(
         &validation.valid_runs,
@@ -46,7 +47,8 @@ fn main() -> Result<()> {
         &aggregates,
         &comparisons,
         args.pretty,
-    )?;
+    )
+    .map_err(miette::Report::from)?;
 
     Ok(())
 }
