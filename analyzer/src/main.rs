@@ -14,20 +14,22 @@ use crate::{
     discovery::discover_runs,
     error::{Error, Result},
     load::validate_runs,
-    output::ensure_out_dir,
+    model::DiscoveryReport,
+    output::{ensure_out_dir, write_artifacts},
 };
 use clap::Parser;
+use std::mem;
 
 fn main() -> Result<()> {
     let args = Args::parse();
     ensure_out_dir(&args.out_dir())?;
-    let discovery = discover_runs(&args.results_dir)?;
+    let mut discovery = discover_runs(&args.results_dir)?;
 
     if args.strict && !discovery.diagnostics.is_empty() {
         return Err(first_discovery_error(&discovery));
     }
 
-    let validation = validate_runs(discovery.runs, args.strict)?;
+    let validation = validate_runs(mem::take(&mut discovery.runs), args.strict)?;
     if validation.valid_runs.is_empty() {
         return Err(Error::NoValidRuns);
     }
@@ -35,12 +37,21 @@ fn main() -> Result<()> {
         &validation.valid_runs,
         args.profile.map(ScheduleProfile::as_str),
     );
-    let _ = compare_aggregates(&aggregates);
+    let comparisons = compare_aggregates(&aggregates);
+    write_artifacts(
+        &args.out_dir(),
+        &args.results_dir,
+        &discovery,
+        &validation,
+        &aggregates,
+        &comparisons,
+        args.pretty,
+    )?;
 
     Ok(())
 }
 
-fn first_discovery_error(discovery: &model::DiscoveryReport) -> Error {
+fn first_discovery_error(discovery: &DiscoveryReport) -> Error {
     if let Some(path) = discovery.diagnostics.unmatched_results.first() {
         return Error::StrictDiscovery {
             message: format!("missing metadata for result file {}", path.display()),

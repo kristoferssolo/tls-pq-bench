@@ -62,6 +62,20 @@ pub enum Error {
         source: serde_json::Error,
     },
 
+    #[error("failed to serialize artifact {name}")]
+    SerializeArtifact {
+        name: &'static str,
+        #[source]
+        source: serde_json::Error,
+    },
+
+    #[error("failed to write artifact {path}")]
+    WriteArtifact {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("strict mode failed during discovery: {message}")]
     StrictDiscovery { message: String },
 
