@@ -1,9 +1,13 @@
 use crate::{
     error::{Error, Result},
     load::{load_bench_records, load_run_metadata},
-    model::{DiscoveredRun, RunMetadata, SkipReason, SkippedRun, ValidRun, ValidationReport},
+    model::{
+        BenchmarkMetadata, DiscoveredRun, RunMetadata, SkipReason, SkippedRun, ValidRun,
+        ValidationReport,
+    },
 };
-use common::BenchRecord;
+use common::{BenchRecord, KeyExchangeMode, ProtocolMode};
+use std::{cmp::Ordering, collections::BTreeSet};
 
 pub fn validate_runs(
     discovered_runs: Vec<DiscoveredRun>,
@@ -121,12 +125,12 @@ fn validation_failure(
         );
     }
 
-    if !records_have_consistent_scenarios(records) {
+    if !records_match_benchmarks(metadata, records) {
         return non_strict_skip_or_error(
             strict,
             SkipReason::ScenarioMismatch,
             format!(
-                "result file {} contains inconsistent scenario rows",
+                "result file {} contains records that do not match metadata benchmarks",
                 discovered.result_path.display()
             ),
         );
@@ -154,19 +158,97 @@ fn all_records_share_run_id(records: &[BenchRecord]) -> bool {
     records.iter().all(|record| record.run_id == first.run_id)
 }
 
-fn records_have_consistent_scenarios(records: &[BenchRecord]) -> bool {
-    let Some(first) = records.first() else {
-        return true;
-    };
+fn records_match_benchmarks(metadata: &RunMetadata, records: &[BenchRecord]) -> bool {
+    let benchmarks = metadata
+        .benchmarks
+        .iter()
+        .map(BenchmarkKey::from)
+        .collect::<BTreeSet<_>>();
 
-    records.iter().all(|record| {
-        record.proto == first.proto
-            && record.mode == first.mode
-            && record.payload_bytes == first.payload_bytes
-            && record.concurrency == first.concurrency
-            && record.iters == first.iters
-            && record.warmup == first.warmup
-    })
+    !benchmarks.is_empty()
+        && records
+            .iter()
+            .map(BenchmarkKey::from)
+            .all(|record| benchmarks.contains(&record))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BenchmarkKey {
+    proto: common::ProtocolMode,
+    mode: common::KeyExchangeMode,
+    payload_bytes: u32,
+    concurrency: u32,
+    iters: u32,
+    warmup: u32,
+}
+
+impl Ord for BenchmarkKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (
+            benchmark_proto_order(self.proto),
+            benchmark_mode_order(self.mode),
+            self.payload_bytes,
+            self.concurrency,
+            self.iters,
+            self.warmup,
+        )
+            .cmp(&(
+                benchmark_proto_order(other.proto),
+                benchmark_mode_order(other.mode),
+                other.payload_bytes,
+                other.concurrency,
+                other.iters,
+                other.warmup,
+            ))
+    }
+}
+
+impl PartialOrd for BenchmarkKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+const fn benchmark_proto_order(proto: ProtocolMode) -> u8 {
+    match proto {
+        ProtocolMode::Raw => 0,
+        ProtocolMode::Http1 => 1,
+    }
+}
+
+const fn benchmark_mode_order(mode: KeyExchangeMode) -> u8 {
+    match mode {
+        KeyExchangeMode::X25519 => 0,
+        KeyExchangeMode::Secp256r1 => 1,
+        KeyExchangeMode::X25519Mlkem768 => 2,
+        KeyExchangeMode::Secp256r1Mlkem768 => 3,
+    }
+}
+
+impl From<&BenchRecord> for BenchmarkKey {
+    fn from(record: &BenchRecord) -> Self {
+        Self {
+            proto: record.proto,
+            mode: record.mode,
+            payload_bytes: record.payload_bytes,
+            concurrency: record.concurrency,
+            iters: record.iters,
+            warmup: record.warmup,
+        }
+    }
+}
+
+impl From<&BenchmarkMetadata> for BenchmarkKey {
+    fn from(benchmark: &BenchmarkMetadata) -> Self {
+        Self {
+            proto: benchmark.proto,
+            mode: benchmark.mode,
+            payload_bytes: benchmark.payload,
+            concurrency: benchmark.concurrency,
+            iters: benchmark.iters,
+            warmup: benchmark.warmup,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -187,6 +269,53 @@ mod tests {
                 r#""mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":2,"warmup":1"#,
             ),
             &valid_meta("ok", None, Some("lite")),
+        );
+
+        let report = assert_ok!(validate_runs(vec![discovered], false));
+
+        assert_eq!(report.valid_runs.len(), 1);
+        assert!(report.skipped_runs.is_empty());
+    }
+
+    #[test]
+    fn validates_multi_scenario_run_pair() {
+        let dir = TempDir::new().expect("temp dir");
+        let discovered = write_discovered_run(
+            &dir,
+            "lite-matrix",
+            concat!(
+                r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":2,"warmup":1,"tcp_ns":10,"handshake_ns":20,"ttlb_ns":30}"#,
+                "\n",
+                r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":1,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":2,"warmup":1,"tcp_ns":11,"handshake_ns":21,"ttlb_ns":31}"#,
+                "\n",
+                r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":0,"proto":"http1","mode":"x25519mlkem768","payload_bytes":2048,"concurrency":4,"iters":2,"warmup":1,"tcp_ns":12,"handshake_ns":22,"ttlb_ns":32}"#,
+                "\n",
+                r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":1,"proto":"http1","mode":"x25519mlkem768","payload_bytes":2048,"concurrency":4,"iters":2,"warmup":1,"tcp_ns":13,"handshake_ns":23,"ttlb_ns":33}"#,
+                "\n"
+            ),
+            &valid_meta_with_benchmarks(
+                "ok",
+                None,
+                Some("lite"),
+                &[
+                    BenchmarkSpec {
+                        proto: "raw",
+                        mode: "x25519",
+                        payload: 1024,
+                        iters: 2,
+                        warmup: 1,
+                        concurrency: 1,
+                    },
+                    BenchmarkSpec {
+                        proto: "http1",
+                        mode: "x25519mlkem768",
+                        payload: 2048,
+                        iters: 2,
+                        warmup: 1,
+                        concurrency: 4,
+                    },
+                ],
+            ),
         );
 
         let report = assert_ok!(validate_runs(vec![discovered], false));
@@ -335,9 +464,35 @@ mod tests {
     }
 
     fn valid_meta(status: &str, error: Option<&str>, profile: Option<&str>) -> String {
+        valid_meta_with_benchmarks(
+            status,
+            error,
+            profile,
+            &[BenchmarkSpec {
+                proto: "raw",
+                mode: "x25519",
+                payload: 1024,
+                iters: 2,
+                warmup: 1,
+                concurrency: 1,
+            }],
+        )
+    }
+
+    fn valid_meta_with_benchmarks(
+        status: &str,
+        error: Option<&str>,
+        profile: Option<&str>,
+        benchmarks: &[BenchmarkSpec],
+    ) -> String {
         let error_field = error.map_or_else(|| "null".to_string(), |value| format!(r#""{value}""#));
         let profile_field =
             profile.map_or_else(|| "null".to_string(), |value| format!(r#""{value}""#));
+        let benchmarks_json = benchmarks
+            .iter()
+            .map(BenchmarkSpec::to_json)
+            .collect::<Vec<_>>()
+            .join(",");
 
         format!(
             concat!(
@@ -353,13 +508,39 @@ mod tests {
                 r#""runner_region":null,"runner_availability_zone":null,"#,
                 r#""server_git_commit":"def","server_host":"server-1","server_instance_type":null,"#,
                 r#""server_region":null,"server_availability_zone":null,"#,
-                r#""benchmarks":[{{"server":"127.0.0.1:4433","server_name":"localhost","#,
-                r#""proto":"raw","mode":"x25519","verification":{{"kind":"insecure"}},"#,
-                r#""payload":1024,"iters":100,"warmup":10,"concurrency":1,"timeout_secs":30}}]}}"#
+                r#""benchmarks":[{benchmarks_json}]}}"#
             ),
             status = status,
             error_field = error_field,
-            profile_field = profile_field
+            profile_field = profile_field,
+            benchmarks_json = benchmarks_json
         )
+    }
+
+    struct BenchmarkSpec {
+        proto: &'static str,
+        mode: &'static str,
+        payload: u32,
+        iters: u32,
+        warmup: u32,
+        concurrency: u32,
+    }
+
+    impl BenchmarkSpec {
+        fn to_json(&self) -> String {
+            format!(
+                concat!(
+                    r#"{{"server":"127.0.0.1:4433","server_name":"localhost","#,
+                    r#""proto":"{proto}","mode":"{mode}","verification":{{"kind":"insecure"}},"#,
+                    r#""payload":{payload},"iters":{iters},"warmup":{warmup},"concurrency":{concurrency},"timeout_secs":30}}"#
+                ),
+                proto = self.proto,
+                mode = self.mode,
+                payload = self.payload,
+                iters = self.iters,
+                warmup = self.warmup,
+                concurrency = self.concurrency,
+            )
+        }
     }
 }
