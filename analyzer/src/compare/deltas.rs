@@ -156,6 +156,9 @@ fn relative_delta(
             context: context.clone(),
             metric,
             field,
+            message: format!(
+                "relative delta omitted for {metric}.{field} because classical value is zero"
+            ),
         });
         return None;
     }
@@ -201,7 +204,9 @@ impl DeltaValue for u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AggregateReport, RunProvenance, ScenarioAggregate, ScenarioKey};
+    use crate::model::{
+        AggregateReport, RunProvenance, ScenarioAggregate, ScenarioKey, ScenarioProvenance,
+    };
     use common::{KeyExchangeMode, ProtocolMode};
     use uuid::Uuid;
 
@@ -252,6 +257,10 @@ mod tests {
         assert_eq!(report.warnings.len(), 4);
         assert_eq!(report.comparisons[0].tcp.mean.relative, None);
         assert_eq!(report.comparisons[0].tcp.p50.relative, None);
+        assert_eq!(
+            report.warnings[0].message,
+            "relative delta omitted for tcp.mean because classical value is zero"
+        );
     }
 
     fn scenario(
@@ -273,7 +282,7 @@ mod tests {
             tcp: metric(mean, p50, p90, p99),
             handshake: metric(mean + 1.0, p50 + 1, p90 + 1, p99 + 1),
             ttlb: metric(mean + 2.0, p50 + 2, p90 + 2, p99 + 2),
-            provenance: vec![RunProvenance {
+            provenance: ScenarioProvenance::from_runs(vec![RunProvenance {
                 run_id: Uuid::nil(),
                 result_path: "/tmp/result.jsonl".into(),
                 started_at_unix_ms: 1,
@@ -282,7 +291,10 @@ mod tests {
                 runner_host: None,
                 server_git_commit: None,
                 server_host: None,
-            }],
+                iters: 100,
+                warmup: 10,
+            }]),
+            warnings: Vec::new(),
         }
     }
 

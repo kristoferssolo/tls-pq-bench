@@ -23,24 +23,6 @@ Each benchmark record captures:
 
 All raw metrics are stored in nanoseconds as JSONL.
 
-## What To Read First
-
-- Want to run something quickly: see [Quick Start](#quick-start)
-- Want the full manual workflow: [docs/runbook.md](docs/runbook.md)
-- Want scheduled remote runs: [docs/scheduled-benchmarks.md](docs/scheduled-benchmarks.md)
-- Want metric and schema details: [docs/measurement-methodology.md](docs/measurement-methodology.md)
-- Want protocol semantics: [docs/protocols.md](docs/protocols.md)
-
-## Repository Map
-
-- `server`: benchmark TLS server
-- `runner`: benchmark client and matrix runner
-- `common`: shared protocol and telemetry code
-- `benchmarks/`: example matrix files
-- `scripts/`: analysis and matrix-generation helpers
-- `ops/`: environment files and systemd units
-- `docs/`: workflow and reference documentation
-
 ## Quick Start
 
 ### Build
@@ -160,16 +142,12 @@ Run the client with CA verification:
 
 ### 3. Scheduled Two-Host Benchmarks
 
-The repo includes helpers for a persistent server host plus a runner host with
-systemd timers.
+The repo includes helpers for a persistent server host plus a runner host with systemd timers.
 
 Main entry points:
 
 - `just prod-server-service env_file=/etc/tls-pq-bench/server.env`
 - `just prod-schedule env_file=/etc/tls-pq-bench/scheduled.env`
-
-The full setup is documented in
-[docs/scheduled-benchmarks.md](docs/scheduled-benchmarks.md).
 
 ## Result Format
 
@@ -179,31 +157,36 @@ Each iteration is emitted as one JSONL record:
 {"run_id":"0195f8cf-2f6f-7e9b-9c52-6e5d6b7d0a10","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":100,"warmup":10,"tcp_ns":120000,"handshake_ns":500000,"ttlb_ns":650000}
 ```
 
-Use the bundled analyzer to summarize one or more result files:
+## Analyzer
+
+The Rust `analyzer` binary summarizes one scheduled-results directory tree into
+weekly JSON artifacts.
+
+Basic usage:
 
 ```bash
-uv run --script scripts/analyze_results.py results.jsonl
+./target/release/analyzer \
+    /path/to/results
 ```
 
 Common options:
 
-- `--unit ns|us|ms`
-- `--format table|markdown|json|csv`
-- `--group-by proto mode payload_bytes concurrency`
+- `--out-dir <dir>`: defaults to `<results-dir>/analysis`
+- `--profile lite|full`: restrict output to one schedule profile
+- `--strict`: abort on the first missing, malformed, or invalid artifact
+- `--pretty true|false`: control JSON pretty-printing, default `true`
 
-## Documentation Guide
+The analyzer recursively discovers paired `*.jsonl` and `*.meta` files by shared
+basename stem and writes four files:
 
-- [docs/runbook.md](docs/runbook.md): step-by-step manual runs
-- [docs/scheduled-benchmarks.md](docs/scheduled-benchmarks.md): recurring remote runs
-- [docs/protocols.md](docs/protocols.md): `raw` vs `http1`
-- [docs/measurement-methodology.md](docs/measurement-methodology.md): metrics and schema
-- [docs/environment.md](docs/environment.md): environment checklist
-- [docs/experiment-plan.md](docs/experiment-plan.md): suggested study design
-- [docs/results-template.md](docs/results-template.md): reporting template
-- [docs/baseline-analysis.md](docs/baseline-analysis.md): summary of baseline findings
-- [docs/implementation-strategy.md](docs/implementation-strategy.md): historical rollout notes
+- `manifest.json`: run counts, profile list, scenario/comparison counts, and artifact paths
+- `weekly_aggregates.json`: per-scenario weekly summaries plus provenance and warnings
+- `pq_deltas.json`: classical vs PQ family comparisons for matching contexts
+- `diagnostics.json`: skipped runs, unmatched artifacts, parse errors, and comparison warnings
+
+Default mode skips bad inputs when possible and records them in
+`diagnostics.json`. Strict mode makes those same problems fatal.
 
 ## License
 
-Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
-[MIT license](LICENSE-MIT) at your option.
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.

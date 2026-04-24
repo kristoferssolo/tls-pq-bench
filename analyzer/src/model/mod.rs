@@ -2,7 +2,7 @@ mod aggregate;
 mod compare;
 mod discovery;
 mod metadata;
-mod ordering;
+pub mod ordering;
 mod validation;
 
 pub use aggregate::*;

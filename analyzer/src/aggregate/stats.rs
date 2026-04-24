@@ -1,8 +1,10 @@
 use crate::model::{
-    AggregateReport, MetricSummary, RunProvenance, ScenarioAggregate, ScenarioKey, ValidRun,
+    AggregateReport, BenchmarkMetadata, MetricSummary, RunProvenance, ScenarioAggregate,
+    ScenarioKey, ScenarioProvenance, ValidRun,
+    ordering::{mode_order, proto_order},
 };
 use common::BenchRecord;
-use std::collections::BTreeMap;
+use std::{cmp::Ordering, collections::BTreeMap};
 
 pub fn aggregate_runs(valid_runs: &[ValidRun], profile_filter: Option<&str>) -> AggregateReport {
     let mut buckets: BTreeMap<ScenarioKey, Vec<ScenarioRun<'_>>> = BTreeMap::new();
@@ -17,6 +19,7 @@ pub fn aggregate_runs(valid_runs: &[ValidRun], profile_filter: Option<&str>) -> 
             continue;
         }
 
+        let benchmark_lookup = benchmark_lookup(&run.metadata.benchmarks);
         let mut run_buckets: BTreeMap<ScenarioKey, Vec<&BenchRecord>> = BTreeMap::new();
         for record in &run.records {
             let key = ScenarioKey::from_record(schedule_profile.clone(), record);
@@ -24,10 +27,15 @@ pub fn aggregate_runs(valid_runs: &[ValidRun], profile_filter: Option<&str>) -> 
         }
 
         for (key, records) in run_buckets {
-            buckets
-                .entry(key)
-                .or_default()
-                .push(ScenarioRun { run, records });
+            let provenance_record = records[0];
+            let benchmark = benchmark_lookup
+                .get(&RecordScenarioKey::from(provenance_record))
+                .copied();
+            buckets.entry(key).or_default().push(ScenarioRun {
+                records,
+                benchmark,
+                provenance: RunProvenance::from_run(run, provenance_record),
+            });
         }
     }
 
@@ -40,34 +48,103 @@ pub fn aggregate_runs(valid_runs: &[ValidRun], profile_filter: Option<&str>) -> 
 }
 
 struct ScenarioRun<'a> {
-    run: &'a ValidRun,
     records: Vec<&'a BenchRecord>,
+    benchmark: Option<&'a BenchmarkMetadata>,
+    provenance: RunProvenance,
 }
 
-fn aggregate_bucket(key: ScenarioKey, runs: &[ScenarioRun<'_>]) -> ScenarioAggregate {
+fn aggregate_bucket(key: ScenarioKey, runs: &[ScenarioRun]) -> ScenarioAggregate {
     let tcp_values = collect_metric(runs, |record| record.tcp_ns);
     let handshake_values = collect_metric(runs, |record| record.handshake_ns);
     let ttlb_values = collect_metric(runs, |record| record.ttlb_ns);
+    let provenance_runs = runs
+        .iter()
+        .map(|scenario_run| scenario_run.provenance.clone())
+        .collect::<Vec<_>>();
+    let warnings = aggregate_warnings(runs);
 
     ScenarioAggregate {
         key,
         tcp: summarize_metric(&tcp_values, runs.len()),
         handshake: summarize_metric(&handshake_values, runs.len()),
         ttlb: summarize_metric(&ttlb_values, runs.len()),
-        provenance: runs
-            .iter()
-            .map(|run| RunProvenance::from(run.run))
-            .collect(),
+        provenance: ScenarioProvenance::from_runs(provenance_runs),
+        warnings,
     }
 }
 
-fn collect_metric(runs: &[ScenarioRun<'_>], selector: impl Fn(&BenchRecord) -> u128) -> Vec<u128> {
+fn collect_metric(runs: &[ScenarioRun], selector: impl Fn(&BenchRecord) -> u128) -> Vec<u128> {
     let mut values = runs
         .iter()
         .flat_map(|run| run.records.iter().copied().map(&selector))
         .collect::<Vec<_>>();
     values.sort_unstable();
     values
+}
+
+fn aggregate_warnings(runs: &[ScenarioRun<'_>]) -> Vec<String> {
+    let mut warnings = Vec::new();
+    let iters = runs
+        .iter()
+        .map(|run| run.provenance.iters)
+        .collect::<std::collections::BTreeSet<_>>();
+    if iters.len() > 1 {
+        warnings.push(format!(
+            "heterogeneous iters across contributing runs: {}",
+            iters
+                .into_iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+
+    let warmup = runs
+        .iter()
+        .map(|run| run.provenance.warmup)
+        .collect::<std::collections::BTreeSet<_>>();
+    if warmup.len() > 1 {
+        warnings.push(format!(
+            "heterogeneous warmup across contributing runs: {}",
+            warmup
+                .into_iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+
+    let benchmark_iters = runs
+        .iter()
+        .filter_map(|run| run.benchmark.map(|benchmark| benchmark.iters))
+        .collect::<std::collections::BTreeSet<_>>();
+    if benchmark_iters.len() > 1 {
+        warnings.push(format!(
+            "heterogeneous metadata iters across contributing runs: {}",
+            benchmark_iters
+                .into_iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+
+    let benchmark_warmup = runs
+        .iter()
+        .filter_map(|run| run.benchmark.map(|benchmark| benchmark.warmup))
+        .collect::<std::collections::BTreeSet<_>>();
+    if benchmark_warmup.len() > 1 {
+        warnings.push(format!(
+            "heterogeneous metadata warmup across contributing runs: {}",
+            benchmark_warmup
+                .into_iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+
+    warnings
 }
 
 fn summarize_metric(values: &[u128], run_count: usize) -> MetricSummary {
@@ -101,10 +178,72 @@ fn parse_f64(value: &impl ToString) -> f64 {
         .expect("numeric values should parse as f64")
 }
 
+fn benchmark_lookup(
+    benchmarks: &[BenchmarkMetadata],
+) -> BTreeMap<RecordScenarioKey, &BenchmarkMetadata> {
+    benchmarks
+        .iter()
+        .map(|benchmark| (RecordScenarioKey::from(benchmark), benchmark))
+        .collect()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RecordScenarioKey {
+    proto: common::ProtocolMode,
+    mode: common::KeyExchangeMode,
+    payload_bytes: u32,
+    concurrency: u32,
+}
+
+impl From<&BenchRecord> for RecordScenarioKey {
+    fn from(record: &BenchRecord) -> Self {
+        Self {
+            proto: record.proto,
+            mode: record.mode,
+            payload_bytes: record.payload_bytes,
+            concurrency: record.concurrency,
+        }
+    }
+}
+
+impl From<&BenchmarkMetadata> for RecordScenarioKey {
+    fn from(benchmark: &BenchmarkMetadata) -> Self {
+        Self {
+            proto: benchmark.proto,
+            mode: benchmark.mode,
+            payload_bytes: benchmark.payload,
+            concurrency: benchmark.concurrency,
+        }
+    }
+}
+
+impl Ord for RecordScenarioKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (
+            proto_order(self.proto),
+            mode_order(self.mode),
+            self.payload_bytes,
+            self.concurrency,
+        )
+            .cmp(&(
+                proto_order(other.proto),
+                mode_order(other.mode),
+                other.payload_bytes,
+                other.concurrency,
+            ))
+    }
+}
+
+impl PartialOrd for RecordScenarioKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{BenchmarkMetadata, DiscoveredRun, RunMetadata};
+    use crate::model::{DiscoveredRun, RunMetadata};
     use common::{KeyExchangeMode, ProtocolMode, VerificationMode};
     use std::collections::BTreeSet;
     use uuid::Uuid;
@@ -121,6 +260,8 @@ mod tests {
                         KeyExchangeMode::X25519,
                         1024,
                         1,
+                        2,
+                        1,
                         10,
                         20,
                         30,
@@ -130,12 +271,13 @@ mod tests {
                         KeyExchangeMode::X25519,
                         1024,
                         1,
+                        2,
+                        1,
                         11,
                         21,
                         31,
                     ),
                 ],
-                &[],
                 "/tmp/lite-a.jsonl",
             ),
             valid_run(
@@ -147,6 +289,8 @@ mod tests {
                         KeyExchangeMode::X25519,
                         1024,
                         1,
+                        2,
+                        1,
                         12,
                         22,
                         32,
@@ -156,12 +300,13 @@ mod tests {
                         KeyExchangeMode::X25519,
                         1024,
                         1,
+                        2,
+                        1,
                         13,
                         23,
                         33,
                     ),
                 ],
-                &[],
                 "/tmp/lite-b.jsonl",
             ),
         ];
@@ -175,7 +320,8 @@ mod tests {
         assert_eq!(scenario.tcp.run_count, 2);
         assert_eq!(scenario.tcp.min, 10);
         assert_eq!(scenario.tcp.max, 13);
-        assert_eq!(scenario.provenance.len(), 2);
+        assert_eq!(scenario.provenance.run_ids.len(), 2);
+        assert!(scenario.warnings.is_empty());
     }
 
     #[test]
@@ -189,11 +335,12 @@ mod tests {
                     KeyExchangeMode::X25519,
                     1024,
                     1,
+                    2,
+                    1,
                     10,
                     20,
                     30,
                 )],
-                &[],
                 "/tmp/lite.jsonl",
             ),
             valid_run(
@@ -204,11 +351,12 @@ mod tests {
                     KeyExchangeMode::X25519,
                     1024,
                     1,
+                    2,
+                    1,
                     11,
                     21,
                     31,
                 )],
-                &[],
                 "/tmp/full.jsonl",
             ),
         ];
@@ -238,11 +386,12 @@ mod tests {
                     KeyExchangeMode::X25519,
                     1024,
                     1,
+                    2,
+                    1,
                     10,
                     20,
                     30,
                 )],
-                &[],
                 "/tmp/lite.jsonl",
             ),
             valid_run(
@@ -253,11 +402,12 @@ mod tests {
                     KeyExchangeMode::X25519,
                     1024,
                     1,
+                    2,
+                    1,
                     11,
                     21,
                     31,
                 )],
-                &[],
                 "/tmp/full.jsonl",
             ),
         ];
@@ -273,20 +423,24 @@ mod tests {
         let runs = vec![valid_run(
             "00000000-0000-0000-0000-000000000001",
             "lite",
-            &[(
-                ProtocolMode::Raw,
-                KeyExchangeMode::X25519,
-                1024,
-                1,
-                1,
-                10,
-                100,
-            )],
             &[
                 (
                     ProtocolMode::Raw,
                     KeyExchangeMode::X25519,
                     1024,
+                    1,
+                    5,
+                    1,
+                    1,
+                    10,
+                    100,
+                ),
+                (
+                    ProtocolMode::Raw,
+                    KeyExchangeMode::X25519,
+                    1024,
+                    1,
+                    5,
                     1,
                     2,
                     20,
@@ -297,6 +451,8 @@ mod tests {
                     KeyExchangeMode::X25519,
                     1024,
                     1,
+                    5,
+                    1,
                     3,
                     30,
                     300,
@@ -306,6 +462,8 @@ mod tests {
                     KeyExchangeMode::X25519,
                     1024,
                     1,
+                    5,
+                    1,
                     4,
                     40,
                     400,
@@ -314,6 +472,8 @@ mod tests {
                     ProtocolMode::Raw,
                     KeyExchangeMode::X25519,
                     1024,
+                    1,
+                    5,
                     1,
                     5,
                     50,
@@ -332,75 +492,70 @@ mod tests {
     }
 
     #[test]
-    fn aggregates_multiple_scenarios_from_one_run() {
-        let runs = vec![valid_run(
-            "00000000-0000-0000-0000-000000000001",
-            "lite",
-            &[
-                (
+    fn mixed_iters_and_warmup_do_not_split_weekly_bucket() {
+        let runs = vec![
+            valid_run(
+                "00000000-0000-0000-0000-000000000001",
+                "lite",
+                &[(
                     ProtocolMode::Raw,
                     KeyExchangeMode::X25519,
                     1024,
+                    1,
+                    2,
                     1,
                     10,
                     20,
                     30,
-                ),
-                (
-                    ProtocolMode::Raw,
-                    KeyExchangeMode::X25519Mlkem768,
-                    1024,
-                    1,
-                    11,
-                    21,
-                    31,
-                ),
-            ],
-            &[
-                (
+                )],
+                "/tmp/lite-a.jsonl",
+            ),
+            valid_run(
+                "00000000-0000-0000-0000-000000000002",
+                "lite",
+                &[(
                     ProtocolMode::Raw,
                     KeyExchangeMode::X25519,
                     1024,
                     1,
-                    12,
-                    22,
-                    32,
-                ),
-                (
-                    ProtocolMode::Raw,
-                    KeyExchangeMode::X25519Mlkem768,
-                    1024,
-                    1,
-                    13,
-                    23,
-                    33,
-                ),
-            ],
-            "/tmp/lite.jsonl",
-        )];
+                    4,
+                    2,
+                    11,
+                    21,
+                    31,
+                )],
+                "/tmp/lite-b.jsonl",
+            ),
+        ];
 
         let report = aggregate_runs(&runs, None);
 
-        assert_eq!(report.scenarios.len(), 2);
-        assert_eq!(report.scenarios[0].tcp.sample_count, 2);
-        assert_eq!(report.scenarios[1].tcp.sample_count, 2);
-        assert_eq!(report.scenarios[0].tcp.run_count, 1);
-        assert_eq!(report.scenarios[1].tcp.run_count, 1);
+        assert_eq!(report.scenarios.len(), 1);
+        let scenario = &report.scenarios[0];
+        assert_eq!(scenario.provenance.iters, vec![2, 4]);
+        assert_eq!(scenario.provenance.warmup, vec![1, 2]);
+        assert_eq!(scenario.warnings.len(), 4);
     }
+
+    type Samples = [(
+        ProtocolMode,
+        KeyExchangeMode,
+        u32,
+        u32,
+        u32,
+        u32,
+        u128,
+        u128,
+        u128,
+    )];
 
     fn valid_run(
         run_id: &str,
         schedule_profile: &str,
-        benchmarks: &[(ProtocolMode, KeyExchangeMode, u32, u32, u128, u128, u128)],
-        extra_samples: &[(ProtocolMode, KeyExchangeMode, u32, u32, u128, u128, u128)],
+        samples: &Samples,
         result_path: &str,
     ) -> ValidRun {
         let run_id = Uuid::parse_str(run_id).expect("valid uuid");
-        let samples = benchmarks
-            .iter()
-            .chain(extra_samples.iter())
-            .copied()
-            .collect::<Vec<_>>();
         ValidRun {
             discovered: DiscoveredRun {
                 stem: format!("{schedule_profile}-{run_id}"),
@@ -433,21 +588,20 @@ mod tests {
                 server_availability_zone: None,
                 benchmarks: samples
                     .iter()
-                    .map(
-                        |&(proto, mode, payload, concurrency, ..)| BenchmarkMetadata {
+                    .map(|&(proto, mode, payload, concurrency, iters, warmup, ..)| {
+                        BenchmarkMetadata {
                             server: "127.0.0.1:4433".to_string(),
                             server_name: "localhost".to_string(),
                             proto,
                             mode,
                             verification: VerificationMode::Insecure,
                             payload,
-                            iters: u32::try_from(samples.len())
-                                .expect("sample count should fit in u32"),
-                            warmup: 1,
+                            iters,
+                            warmup,
                             concurrency,
                             timeout_secs: 30,
-                        },
-                    )
+                        }
+                    })
                     .collect(),
             },
             records: samples
@@ -456,7 +610,17 @@ mod tests {
                 .map(
                     |(
                         iteration,
-                        &(proto, mode, payload_bytes, concurrency, tcp_ns, handshake_ns, ttlb_ns),
+                        &(
+                            proto,
+                            mode,
+                            payload_bytes,
+                            concurrency,
+                            iters,
+                            warmup,
+                            tcp_ns,
+                            handshake_ns,
+                            ttlb_ns,
+                        ),
                     )| BenchRecord {
                         run_id,
                         iteration: u32::try_from(iteration).expect("iteration should fit in u32"),
@@ -464,9 +628,8 @@ mod tests {
                         mode,
                         payload_bytes,
                         concurrency,
-                        iters: u32::try_from(samples.len())
-                            .expect("sample count should fit in u32"),
-                        warmup: 1,
+                        iters,
+                        warmup,
                         tcp_ns,
                         handshake_ns,
                         ttlb_ns,

@@ -1,9 +1,9 @@
 use crate::{
     error::{Error, Result},
     model::{
-        AggregateReport, ComparisonFamily, ComparisonReport, ComparisonWarning, DiscoveryReport,
-        InvalidPairing, MetricComparison, MetricSummary, PairwiseComparison, RunProvenance,
-        ScenarioAggregate, SkipReason, SkippedRun, ValidationReport,
+        AggregateReport, ComparisonReport, ComparisonWarning, DiscoveryReport, MetricComparison,
+        MetricSummary, PairwiseComparison, ScenarioAggregate, ScenarioProvenance, SkipReason,
+        SkippedRun, ValidationReport,
     },
 };
 use serde::Serialize;
@@ -38,7 +38,7 @@ pub fn write_artifacts(
     let weekly = map_weekly_aggregates(aggregates);
     let deltas = map_pq_deltas(comparisons);
     let diagnostics = map_diagnostics(discovery, validation, comparisons);
-    let manifest = map_manifest(results_dir, validation, aggregates, comparisons);
+    let manifest = map_manifest(results_dir, validation, &weekly, &deltas, &diagnostics);
 
     write_json(
         &out_dir.join(WEEKLY_AGGREGATES_FILE),
@@ -90,25 +90,18 @@ fn write_json<T: Serialize>(
 fn map_manifest(
     results_dir: &Path,
     validation: &ValidationReport,
-    aggregates: &AggregateReport,
-    comparisons: &ComparisonReport,
+    weekly: &WeeklyAggregatesFile,
+    deltas: &PqDeltasFile,
+    diagnostics: &DiagnosticsFile,
 ) -> ManifestFile {
-    let profiles_found = aggregates
-        .scenarios
-        .iter()
-        .map(|scenario| scenario.key.schedule_profile.clone())
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect();
-
     ManifestFile {
         results_dir: results_dir.display().to_string(),
         generated_at_unix_ms: unix_time_ms(),
-        profiles_found,
+        profiles_found: weekly.profiles.clone(),
         valid_run_count: validation.valid_runs.len(),
-        skipped_run_count: validation.skipped_runs.len(),
-        scenario_count: aggregates.scenarios.len(),
-        comparison_count: comparisons.comparisons.len(),
+        skipped_run_count: diagnostics.skipped_runs.len(),
+        scenario_count: weekly.scenarios.len(),
+        comparison_count: deltas.comparisons.len(),
         weekly_aggregates: WEEKLY_AGGREGATES_FILE.to_string(),
         pq_deltas: PQ_DELTAS_FILE.to_string(),
         diagnostics: DIAGNOSTICS_FILE.to_string(),
@@ -180,7 +173,15 @@ fn map_diagnostics(
             .diagnostics
             .invalid_pairings
             .iter()
-            .map(map_invalid_pairing_error)
+            .map(|invalid| ParseErrorDto {
+                kind: "invalid_pairing".to_string(),
+                path: invalid.stem.clone(),
+                message: format!(
+                    "ambiguous pairing with {} result file(s) and {} metadata file(s)",
+                    invalid.result_paths.len(),
+                    invalid.meta_paths.len()
+                ),
+            })
             .chain(
                 validation
                     .skipped_runs
@@ -206,8 +207,27 @@ fn map_scenario_aggregate(scenario: &ScenarioAggregate) -> ScenarioAggregateDto 
         tcp: map_metric_summary(&scenario.tcp),
         handshake: map_metric_summary(&scenario.handshake),
         ttlb: map_metric_summary(&scenario.ttlb),
-        provenance: scenario.provenance.iter().map(map_run_provenance).collect(),
-        warnings: Vec::new(),
+        provenance: map_scenario_provenance(&scenario.provenance),
+        warnings: scenario.warnings.clone(),
+    }
+}
+
+fn map_scenario_provenance(provenance: &ScenarioProvenance) -> ScenarioProvenanceDto {
+    ScenarioProvenanceDto {
+        run_ids: provenance.run_ids.iter().map(ToString::to_string).collect(),
+        result_paths: provenance
+            .result_paths
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect(),
+        started_at_unix_ms: provenance.started_at_unix_ms.clone(),
+        finished_at_unix_ms: provenance.finished_at_unix_ms.clone(),
+        runner_hosts: provenance.runner_hosts.clone(),
+        runner_git_commits: provenance.runner_git_commits.clone(),
+        server_hosts: provenance.server_hosts.clone(),
+        server_git_commits: provenance.server_git_commits.clone(),
+        iters: provenance.iters.clone(),
+        warmup: provenance.warmup.clone(),
     }
 }
 
@@ -236,19 +256,6 @@ const fn map_metric_summary(summary: &MetricSummary) -> MetricSummaryDto {
         p50: summary.p50,
         p90: summary.p90,
         p99: summary.p99,
-    }
-}
-
-fn map_run_provenance(provenance: &RunProvenance) -> RunProvenanceDto {
-    RunProvenanceDto {
-        run_id: provenance.run_id.to_string(),
-        result_path: provenance.result_path.display().to_string(),
-        started_at_unix_ms: provenance.started_at_unix_ms,
-        finished_at_unix_ms: provenance.finished_at_unix_ms,
-        runner_git_commit: provenance.runner_git_commit.clone(),
-        runner_host: provenance.runner_host.clone(),
-        server_git_commit: provenance.server_git_commit.clone(),
-        server_host: provenance.server_host.clone(),
     }
 }
 
@@ -285,18 +292,6 @@ fn map_skipped_run(skipped: &SkippedRun) -> SkippedRunDto {
     }
 }
 
-fn map_invalid_pairing_error(invalid: &InvalidPairing) -> ParseErrorDto {
-    ParseErrorDto {
-        kind: "invalid_pairing".to_string(),
-        path: invalid.stem.clone(),
-        message: format!(
-            "ambiguous pairing with {} result file(s) and {} metadata file(s)",
-            invalid.result_paths.len(),
-            invalid.meta_paths.len()
-        ),
-    }
-}
-
 fn map_parse_error_from_skipped_run(skipped: &SkippedRun) -> Option<ParseErrorDto> {
     match &skipped.reason {
         SkipReason::MetadataParseError { message } => Some(ParseErrorDto {
@@ -322,13 +317,14 @@ fn map_comparison_warning(warning: &ComparisonWarning) -> ComparisonWarningDto {
         concurrency: warning.context.concurrency,
         metric: warning.metric.to_string(),
         field: warning.field.to_string(),
+        message: warning.message.clone(),
     }
 }
 
-const fn comparison_family_name(family: ComparisonFamily) -> &'static str {
+const fn comparison_family_name(family: crate::model::ComparisonFamily) -> &'static str {
     match family {
-        ComparisonFamily::X25519 => "x25519_family",
-        ComparisonFamily::Secp256r1 => "secp256r1_family",
+        crate::model::ComparisonFamily::X25519 => "x25519_family",
+        crate::model::ComparisonFamily::Secp256r1 => "secp256r1_family",
     }
 }
 
@@ -339,7 +335,8 @@ const fn skipped_reason_name(reason: &SkipReason) -> &'static str {
         SkipReason::MetadataStatusError { .. } => "metadata_status_error",
         SkipReason::EmptyResultFile => "empty_result_file",
         SkipReason::RunIdMismatch => "run_id_mismatch",
-        SkipReason::ScenarioMismatch => "scenario_mismatch",
+        SkipReason::MetadataRunIdMismatch { .. } => "metadata_run_id_mismatch",
+        SkipReason::ScenarioMismatch { .. } => "scenario_mismatch",
     }
 }
 
@@ -352,9 +349,14 @@ fn skipped_reason_detail(reason: &SkipReason) -> Option<String> {
             || format!("status={status}"),
             |error| format!("status={status}: {error}"),
         )),
-        SkipReason::EmptyResultFile | SkipReason::RunIdMismatch | SkipReason::ScenarioMismatch => {
-            None
-        }
+        SkipReason::MetadataRunIdMismatch {
+            metadata_run_id,
+            record_run_id,
+        } => Some(format!(
+            "metadata run_id {metadata_run_id} does not match record run_id {record_run_id}"
+        )),
+        SkipReason::ScenarioMismatch { detail } => Some(detail.clone()),
+        SkipReason::EmptyResultFile | SkipReason::RunIdMismatch => None,
     }
 }
 
@@ -410,8 +412,22 @@ struct ScenarioAggregateDto {
     tcp: MetricSummaryDto,
     handshake: MetricSummaryDto,
     ttlb: MetricSummaryDto,
-    provenance: Vec<RunProvenanceDto>,
+    provenance: ScenarioProvenanceDto,
     warnings: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ScenarioProvenanceDto {
+    run_ids: Vec<String>,
+    result_paths: Vec<String>,
+    started_at_unix_ms: Vec<u128>,
+    finished_at_unix_ms: Vec<u128>,
+    runner_hosts: Vec<String>,
+    runner_git_commits: Vec<String>,
+    server_hosts: Vec<String>,
+    server_git_commits: Vec<String>,
+    iters: Vec<u32>,
+    warmup: Vec<u32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -424,18 +440,6 @@ struct MetricSummaryDto {
     p50: u128,
     p90: u128,
     p99: u128,
-}
-
-#[derive(Debug, Serialize)]
-struct RunProvenanceDto {
-    run_id: String,
-    result_path: String,
-    started_at_unix_ms: u128,
-    finished_at_unix_ms: u128,
-    runner_git_commit: Option<String>,
-    runner_host: Option<String>,
-    server_git_commit: Option<String>,
-    server_host: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -499,14 +503,16 @@ struct ComparisonWarningDto {
     concurrency: u32,
     metric: String,
     field: String,
+    message: String,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::{
-        ComparisonContext, DiscoveredRun, DiscoveryDiagnostics, PairwiseComparison, RunMetadata,
-        ValidRun,
+        ComparisonContext, ComparisonFamily, Delta, DiscoveredRun, DiscoveryDiagnostics,
+        InvalidPairing, MetricSummary, PairwiseComparison, RunMetadata, ScenarioKey,
+        ScenarioProvenance, ValidRun,
     };
     use common::{BenchRecord, KeyExchangeMode, ProtocolMode};
     use std::path::PathBuf;
@@ -519,10 +525,10 @@ mod tests {
         let out_dir = dir.path().join("analysis");
         ensure_out_dir(&out_dir).expect("out dir");
 
-        let discovery = discovery_report(dir.path());
-        let validation = validation_report(dir.path());
-        let aggregates = aggregate_report(&validation);
-        let comparisons = comparison_report(&aggregates);
+        let discovery = discovery_report();
+        let validation = validation_report();
+        let aggregates = aggregate_report();
+        let comparisons = comparison_report();
 
         write_artifacts(
             &out_dir,
@@ -535,115 +541,86 @@ mod tests {
         )
         .expect("artifacts should be written");
 
-        for file in [
-            MANIFEST_FILE,
-            WEEKLY_AGGREGATES_FILE,
-            PQ_DELTAS_FILE,
-            DIAGNOSTICS_FILE,
-        ] {
-            assert!(out_dir.join(file).is_file(), "{file} should exist");
-        }
+        let manifest = fs::read_to_string(out_dir.join(MANIFEST_FILE)).expect("manifest");
+        let weekly = fs::read_to_string(out_dir.join(WEEKLY_AGGREGATES_FILE)).expect("weekly");
+        let deltas = fs::read_to_string(out_dir.join(PQ_DELTAS_FILE)).expect("deltas");
+        let diagnostics = fs::read_to_string(out_dir.join(DIAGNOSTICS_FILE)).expect("diagnostics");
+
+        assert!(manifest.contains(r#""profiles_found": ["#));
+        assert!(weekly.contains(r#""run_ids": ["#));
+        assert!(weekly.contains(r#""warnings": ["#));
+        assert!(deltas.contains(r#""family": "x25519_family""#));
+        assert!(diagnostics.contains(r#""kind": "invalid_pairing""#));
+        assert!(diagnostics.contains(r#""message": "relative delta omitted""#));
     }
 
-    fn valid_run(result_path: PathBuf) -> ValidRun {
-        ValidRun {
-            discovered: DiscoveredRun {
-                stem: "lite-ok".to_string(),
-                result_path: result_path.clone(),
-                meta_path: result_path.with_extension("meta"),
-            },
-            metadata: RunMetadata {
-                run_id: Uuid::nil(),
-                status: "ok".to_string(),
-                error: None,
-                started_at_unix_ms: 1,
-                finished_at_unix_ms: 2,
-                rust_version: "rustc".to_string(),
-                os: "linux".to_string(),
-                arch: "x86_64".to_string(),
-                command: "runner".to_string(),
-                config_file: None,
-                result_path: Some(result_path),
-                log_path: None,
-                schedule_profile: Some("lite".to_string()),
-                runner_git_commit: Some("abc".to_string()),
-                runner_host: Some("runner".to_string()),
-                runner_instance_type: None,
-                runner_region: None,
-                runner_availability_zone: None,
-                server_git_commit: Some("def".to_string()),
-                server_host: Some("server".to_string()),
-                server_instance_type: None,
-                server_region: None,
-                server_availability_zone: None,
-                benchmarks: vec![],
-            },
-            records: vec![BenchRecord {
-                run_id: Uuid::nil(),
-                iteration: 0,
-                proto: ProtocolMode::Raw,
-                mode: KeyExchangeMode::X25519,
-                payload_bytes: 1024,
-                concurrency: 1,
-                iters: 1,
-                warmup: 0,
-                tcp_ns: 10,
-                handshake_ns: 20,
-                ttlb_ns: 30,
-            }],
-        }
-    }
-
-    fn discovery_report(root: &Path) -> DiscoveryReport {
+    fn discovery_report() -> DiscoveryReport {
         DiscoveryReport {
             runs: vec![],
             diagnostics: DiscoveryDiagnostics {
-                unmatched_results: vec![root.join("missing.meta.jsonl")],
-                unmatched_meta: vec![root.join("missing.result.meta")],
+                unmatched_results: vec![PathBuf::from("/tmp/orphan.jsonl")],
+                unmatched_meta: vec![PathBuf::from("/tmp/orphan.meta")],
                 invalid_pairings: vec![InvalidPairing {
-                    stem: "dup".to_string(),
-                    result_paths: vec![root.join("dup-a.jsonl"), root.join("dup-b.jsonl")],
-                    meta_paths: vec![root.join("dup.meta")],
+                    stem: "dup-run".to_string(),
+                    result_paths: vec![PathBuf::from("/tmp/dup-run.jsonl")],
+                    meta_paths: vec![
+                        PathBuf::from("/tmp/dup-run.meta"),
+                        PathBuf::from("/tmp/nested/dup-run.meta"),
+                    ],
                 }],
             },
         }
     }
 
-    fn validation_report(root: &Path) -> ValidationReport {
+    fn validation_report() -> ValidationReport {
         ValidationReport {
-            valid_runs: vec![valid_run(root.join("lite.jsonl"))],
+            valid_runs: vec![valid_run()],
             skipped_runs: vec![SkippedRun {
                 discovered: DiscoveredRun {
-                    stem: "bad".to_string(),
-                    result_path: root.join("bad.jsonl"),
-                    meta_path: root.join("bad.meta"),
+                    stem: "bad-run".to_string(),
+                    result_path: "/tmp/bad-run.jsonl".into(),
+                    meta_path: "/tmp/bad-run.meta".into(),
                 },
                 reason: SkipReason::ResultParseError {
-                    message: "bad line".to_string(),
+                    message: "bad json".to_string(),
                 },
             }],
         }
     }
 
-    fn aggregate_report(validation: &ValidationReport) -> AggregateReport {
+    fn aggregate_report() -> AggregateReport {
         AggregateReport {
             scenarios: vec![ScenarioAggregate {
-                key: crate::model::ScenarioKey {
+                key: ScenarioKey {
                     schedule_profile: "lite".to_string(),
                     proto: ProtocolMode::Raw,
                     mode: KeyExchangeMode::X25519,
                     payload_bytes: 1024,
                     concurrency: 1,
                 },
-                tcp: metric_summary(11.0, 10, 12),
-                handshake: metric_summary(21.0, 20, 22),
-                ttlb: metric_summary(31.0, 30, 32),
-                provenance: vec![RunProvenance::from(&validation.valid_runs[0])],
+                tcp: metric_summary(),
+                handshake: metric_summary(),
+                ttlb: metric_summary(),
+                provenance: ScenarioProvenance::from_runs(vec![crate::model::RunProvenance {
+                    run_id: Uuid::nil(),
+                    result_path: "/tmp/result.jsonl".into(),
+                    started_at_unix_ms: 1,
+                    finished_at_unix_ms: 2,
+                    runner_git_commit: Some("runner".to_string()),
+                    runner_host: Some("runner-host".to_string()),
+                    server_git_commit: Some("server".to_string()),
+                    server_host: Some("server-host".to_string()),
+                    iters: 100,
+                    warmup: 10,
+                }]),
+                warnings: vec![
+                    "heterogeneous iters across contributing runs: 100, 200".to_string(),
+                ],
             }],
         }
     }
 
-    fn comparison_report(aggregates: &AggregateReport) -> ComparisonReport {
+    fn comparison_report() -> ComparisonReport {
         ComparisonReport {
             comparisons: vec![PairwiseComparison {
                 family: ComparisonFamily::X25519,
@@ -655,9 +632,9 @@ mod tests {
                 },
                 classical_mode: KeyExchangeMode::X25519,
                 pq_mode: KeyExchangeMode::X25519Mlkem768,
-                tcp: metric_comparison(&aggregates.scenarios[0].tcp),
-                handshake: metric_comparison(&aggregates.scenarios[0].handshake),
-                ttlb: metric_comparison(&aggregates.scenarios[0].ttlb),
+                tcp: metric_comparison(),
+                handshake: metric_comparison(),
+                ttlb: metric_comparison(),
             }],
             warnings: vec![ComparisonWarning {
                 family: ComparisonFamily::X25519,
@@ -669,40 +646,91 @@ mod tests {
                 },
                 metric: "tcp",
                 field: "mean",
+                message: "relative delta omitted".to_string(),
             }],
         }
     }
 
-    const fn metric_summary(mean: f64, min: u128, max: u128) -> MetricSummary {
-        MetricSummary {
-            sample_count: 2,
-            run_count: 1,
-            mean,
-            min,
-            max,
-            p50: min,
-            p90: max,
-            p99: max,
+    fn valid_run() -> ValidRun {
+        let run_id = Uuid::nil();
+        ValidRun {
+            discovered: DiscoveredRun {
+                stem: "lite-ok".to_string(),
+                result_path: "/tmp/result.jsonl".into(),
+                meta_path: "/tmp/result.meta".into(),
+            },
+            metadata: RunMetadata {
+                run_id,
+                status: "ok".to_string(),
+                error: None,
+                started_at_unix_ms: 1,
+                finished_at_unix_ms: 2,
+                rust_version: "rustc".to_string(),
+                os: "linux".to_string(),
+                arch: "x86_64".to_string(),
+                command: "runner".to_string(),
+                config_file: None,
+                result_path: None,
+                log_path: None,
+                schedule_profile: Some("lite".to_string()),
+                runner_git_commit: None,
+                runner_host: None,
+                runner_instance_type: None,
+                runner_region: None,
+                runner_availability_zone: None,
+                server_git_commit: None,
+                server_host: None,
+                server_instance_type: None,
+                server_region: None,
+                server_availability_zone: None,
+                benchmarks: vec![],
+            },
+            records: vec![BenchRecord {
+                run_id,
+                iteration: 0,
+                proto: ProtocolMode::Raw,
+                mode: KeyExchangeMode::X25519,
+                payload_bytes: 1024,
+                concurrency: 1,
+                iters: 100,
+                warmup: 10,
+                tcp_ns: 10,
+                handshake_ns: 20,
+                ttlb_ns: 30,
+            }],
         }
     }
 
-    fn metric_comparison(summary: &MetricSummary) -> MetricComparison {
+    fn metric_summary() -> MetricSummary {
+        MetricSummary {
+            sample_count: 10,
+            run_count: 2,
+            mean: 12.5,
+            min: 10,
+            max: 15,
+            p50: 11,
+            p90: 14,
+            p99: 15,
+        }
+    }
+
+    fn metric_comparison() -> MetricComparison {
         MetricComparison {
-            classical: summary.clone(),
-            pq: summary.clone(),
-            mean: crate::model::Delta {
+            classical: metric_summary(),
+            pq: metric_summary(),
+            mean: Delta {
                 absolute: 1.0,
                 relative: Some(0.1),
             },
-            p50: crate::model::Delta {
+            p50: Delta {
                 absolute: 1,
                 relative: Some(0.1),
             },
-            p90: crate::model::Delta {
+            p90: Delta {
                 absolute: 1,
                 relative: Some(0.1),
             },
-            p99: crate::model::Delta {
+            p99: Delta {
                 absolute: 1,
                 relative: Some(0.1),
             },

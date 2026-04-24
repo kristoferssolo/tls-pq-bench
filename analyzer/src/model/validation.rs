@@ -1,5 +1,6 @@
 use crate::model::{DiscoveredRun, RunMetadata};
 use common::BenchRecord;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct ValidRun {
@@ -28,7 +29,13 @@ pub enum SkipReason {
     },
     EmptyResultFile,
     RunIdMismatch,
-    ScenarioMismatch,
+    MetadataRunIdMismatch {
+        metadata_run_id: Uuid,
+        record_run_id: Uuid,
+    },
+    ScenarioMismatch {
+        detail: String,
+    },
 }
 
 #[derive(Debug, Default, Clone)]

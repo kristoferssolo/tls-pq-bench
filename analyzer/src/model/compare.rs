@@ -104,6 +104,7 @@ pub struct ComparisonWarning {
     pub context: ComparisonContext,
     pub metric: &'static str,
     pub field: &'static str,
+    pub message: String,
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
