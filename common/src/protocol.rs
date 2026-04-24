@@ -13,6 +13,9 @@ pub const REQUEST_SIZE: usize = 8;
 /// Maximum allowed payload size (16 MiB).
 pub const MAX_PAYLOAD_SIZE: u64 = 16 * 1024 * 1024;
 
+/// Payload write/read buffer size.
+pub const PAYLOAD_CHUNK_SIZE: usize = 64 * 1024;
+
 /// Read the payload size request from a stream.
 ///
 /// # Errors
@@ -50,7 +53,14 @@ pub async fn write_request<W: AsyncWriteExt + Unpin>(
 #[inline]
 #[must_use]
 pub fn generate_payload(size: impl Into<Payload>) -> Vec<u8> {
-    (0..size.into()).map(|i| (i & 0xFF) as u8).collect()
+    (0..size.into()).map(payload_byte).collect()
+}
+
+/// Fill a buffer with the deterministic benchmark payload pattern.
+pub fn fill_payload_chunk(buf: &mut [u8], offset: Payload) {
+    for (absolute_offset, byte) in (offset..).zip(buf.iter_mut()) {
+        *byte = payload_byte(absolute_offset);
+    }
 }
 
 /// Write deterministic payload to a stream.
@@ -63,18 +73,18 @@ pub async fn write_payload<W: AsyncWriteExt + Unpin>(
     writer: &mut W,
     size: Payload,
 ) -> io::Result<()> {
-    const CHUNK_SIZE: usize = 64 * 1024;
-    let mut remaining = size as usize;
+    const PAYLOAD_CHUNK_SIZE_U64: Payload = PAYLOAD_CHUNK_SIZE as Payload;
+
+    let mut remaining = size;
     let mut offset = 0;
+    let mut chunk = vec![0; PAYLOAD_CHUNK_SIZE];
 
     while remaining > 0 {
-        let chunk_len = remaining.min(CHUNK_SIZE);
-        let chunk = (0..chunk_len)
-            .map(|i| ((offset + i) & 0xFF) as u8)
-            .collect::<Vec<_>>();
-        writer.write_all(&chunk).await?;
-        remaining -= chunk_len;
-        offset += chunk_len;
+        let chunk_len = remaining.min(PAYLOAD_CHUNK_SIZE_U64) as usize;
+        fill_payload_chunk(&mut chunk[..chunk_len], offset);
+        writer.write_all(&chunk[..chunk_len]).await?;
+        remaining -= chunk_len as Payload;
+        offset += chunk_len as Payload;
     }
 
     Ok(())
@@ -88,18 +98,22 @@ pub async fn read_payload<R: AsyncReadExt + Unpin>(
     reader: &mut R,
     expected_size: impl Into<Payload>,
 ) -> io::Result<Payload> {
-    const CHUNK_SIZE: usize = 64 * 1024;
     let expected_size = expected_size.into();
-    let mut buf = vec![0; CHUNK_SIZE];
+    let mut buf = vec![0; PAYLOAD_CHUNK_SIZE];
     let mut total_read = 0;
 
     while total_read < expected_size {
-        let to_read = ((expected_size - total_read) as usize).min(CHUNK_SIZE);
+        let to_read = ((expected_size - total_read) as usize).min(PAYLOAD_CHUNK_SIZE);
         reader.read_exact(&mut buf[..to_read]).await?;
         total_read += to_read as u64;
     }
 
     Ok(total_read)
+}
+
+#[inline]
+const fn payload_byte(offset: Payload) -> u8 {
+    offset.to_le_bytes()[0]
 }
 
 #[cfg(test)]

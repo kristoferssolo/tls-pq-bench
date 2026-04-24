@@ -56,12 +56,12 @@ pub async fn handle_raw_connection(
             }
         };
 
-        debug!(%peer, payload_size , "raw paylad write started");
+        debug!(%peer, payload_size, "raw payload write started");
         if let Err(e) = write_payload(&mut tls_stream, payload_size).await {
             warn!(peer = %peer, error = %e, "write error");
             break;
         }
-        debug!(%peer, payload_size , "raw paylad write complete");
+        debug!(%peer, payload_size, "raw payload write complete");
 
         // Flush to ensure data is sent
         if let Err(e) = tls_stream.flush().await {

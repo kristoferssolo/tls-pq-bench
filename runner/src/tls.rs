@@ -1,13 +1,10 @@
-use common::{VerificationMode, prelude::*};
+use common::{VerificationMode, prelude::*, tls::key_exchange_groups};
 use miette::{Context, IntoDiagnostic};
 use rustls::{
     ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme,
     client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
     compress::CompressionCache,
-    crypto::aws_lc_rs::{
-        self,
-        kx_group::{SECP256R1, SECP256R1MLKEM768, X25519, X25519MLKEM768},
-    },
+    crypto::aws_lc_rs,
     pki_types::{CertificateDer, ServerName, UnixTime},
     version::TLS13,
 };
@@ -70,12 +67,7 @@ pub fn build_tls_config(
     verification: &VerificationMode,
 ) -> miette::Result<ClientConfig> {
     let mut provider = aws_lc_rs::default_provider();
-    provider.kx_groups = match mode {
-        KeyExchangeMode::X25519 => vec![X25519],
-        KeyExchangeMode::Secp256r1 => vec![SECP256R1],
-        KeyExchangeMode::X25519Mlkem768 => vec![X25519MLKEM768],
-        KeyExchangeMode::Secp256r1Mlkem768 => vec![SECP256R1MLKEM768],
-    };
+    provider.kx_groups = key_exchange_groups(mode);
 
     let builder = ClientConfig::builder_with_provider(Arc::new(provider))
         .with_protocol_versions(&[&TLS13])

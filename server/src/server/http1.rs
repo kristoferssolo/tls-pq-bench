@@ -79,7 +79,7 @@ fn handle_request<B>(req: &Request<B>) -> Response<RespBody> {
         }
     };
 
-    let mut response = Response::new(steaming_payload_body(n));
+    let mut response = Response::new(streaming_payload_body(n));
     *response.status_mut() = StatusCode::OK;
 
     let headers = response.headers_mut();
@@ -100,17 +100,14 @@ fn handle_request<B>(req: &Request<B>) -> Response<RespBody> {
 }
 
 #[allow(clippy::cast_possible_truncation)]
-fn steaming_payload_body(size: u64) -> BoxBody<Bytes, Infallible> {
-    const CHUNK_SIZE: usize = 64 * 1024;
-
+fn streaming_payload_body(size: u64) -> BoxBody<Bytes, Infallible> {
     let stream = stream::unfold((size as usize, 0), |(remaining, offset)| async move {
         if remaining == 0 {
             return None;
         }
-        let chunk_len = remaining.min(CHUNK_SIZE);
-        let chunk = (0..chunk_len)
-            .map(|i| ((offset + i) & 0xFF) as u8)
-            .collect::<Vec<_>>();
+        let chunk_len = remaining.min(PAYLOAD_CHUNK_SIZE);
+        let mut chunk = vec![0; chunk_len];
+        fill_payload_chunk(&mut chunk, offset as u64);
         let frame = Frame::data(Bytes::from(chunk));
 
         Some((
@@ -330,7 +327,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn handle_request_get_bytes_streams_across_chunk_boundry() {
+    async fn handle_request_get_bytes_streams_across_chunk_boundary() {
         let req = make_get_request("/bytes/70000");
 
         let resp = handle_request(&req);

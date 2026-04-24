@@ -3,6 +3,7 @@ pub mod error;
 pub mod prelude;
 pub mod protocol;
 pub mod telemetry;
+pub mod tls;
 
 use clap::ValueEnum;
 pub use error::Error;

@@ -54,7 +54,7 @@ pub struct Args {
     #[arg(long, short)]
     pub config: Option<PathBuf>,
 
-    /// Config file for matrix benchmarks (TOML)
+    /// CA certificate to verify the server certificate
     #[arg(long)]
     pub ca_cert: Option<PathBuf>,
 }
