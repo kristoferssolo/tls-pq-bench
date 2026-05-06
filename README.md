@@ -172,7 +172,7 @@ Basic usage:
 Common options:
 
 - `--out-dir <dir>`: defaults to `<results-dir>/analysis`
-- `--profile lite|full`: restrict output to one schedule profile
+- `--profile reduced|full`: restrict output to one schedule profile
 - `--strict`: abort on the first missing, malformed, or invalid artifact
 - `--pretty true|false`: control JSON pretty-printing, default `true`
 

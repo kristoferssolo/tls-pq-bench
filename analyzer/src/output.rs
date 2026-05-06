@@ -592,7 +592,7 @@ mod tests {
         AggregateReport {
             scenarios: vec![ScenarioAggregate {
                 key: ScenarioKey {
-                    schedule_profile: "lite".to_string(),
+                    schedule_profile: "reduced".to_string(),
                     proto: ProtocolMode::Raw,
                     mode: KeyExchangeMode::X25519,
                     payload_bytes: 1024,
@@ -625,7 +625,7 @@ mod tests {
             comparisons: vec![PairwiseComparison {
                 family: ComparisonFamily::X25519,
                 context: ComparisonContext {
-                    schedule_profile: "lite".to_string(),
+                    schedule_profile: "reduced".to_string(),
                     proto: ProtocolMode::Raw,
                     payload_bytes: 1024,
                     concurrency: 1,
@@ -639,7 +639,7 @@ mod tests {
             warnings: vec![ComparisonWarning {
                 family: ComparisonFamily::X25519,
                 context: ComparisonContext {
-                    schedule_profile: "lite".to_string(),
+                    schedule_profile: "reduced".to_string(),
                     proto: ProtocolMode::Raw,
                     payload_bytes: 1024,
                     concurrency: 1,
@@ -655,7 +655,7 @@ mod tests {
         let run_id = Uuid::nil();
         ValidRun {
             discovered: DiscoveredRun {
-                stem: "lite-ok".to_string(),
+                stem: "reduced-ok".to_string(),
                 result_path: "/tmp/result.jsonl".into(),
                 meta_path: "/tmp/result.meta".into(),
             },
@@ -672,7 +672,7 @@ mod tests {
                 config_file: None,
                 result_path: None,
                 log_path: None,
-                schedule_profile: Some("lite".to_string()),
+                schedule_profile: Some("reduced".to_string()),
                 runner_git_commit: None,
                 runner_host: None,
                 runner_instance_type: None,

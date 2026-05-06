@@ -2,13 +2,13 @@
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-    echo "usage: $0 <lite|full>" >&2
+    echo "usage: $0 <reduced|full>" >&2
     exit 2
 fi
 
 profile="$1"
 case "${profile}" in
-    lite|full) ;;
+    reduced|full) ;;
     *)
         echo "unknown profile: ${profile}" >&2
         exit 2
@@ -26,11 +26,11 @@ RUNNER_BIN="${RUNNER_BIN:-${REPO_DIR}/target/release/runner}"
 RESULTS_DIR="${RESULTS_DIR:-${REPO_DIR}/results/scheduled}"
 LOG_DIR="${LOG_DIR:-${REPO_DIR}/.logs/scheduled}"
 LOCK_DIR="${LOCK_DIR:-${REPO_DIR}/.locks}"
-LITE_CONFIG="${LITE_CONFIG:-${REPO_DIR}/benchmarks/remote-recurring.toml}"
+REDUCED_CONFIG="${REDUCED_CONFIG:-${REPO_DIR}/benchmarks/remote-recurring.toml}"
 FULL_CONFIG="${FULL_CONFIG:-${REPO_DIR}/benchmarks/remote-full.toml}"
 
 case "${profile}" in
-    lite) config_path="${LITE_CONFIG}" ;;
+    reduced) config_path="${REDUCED_CONFIG}" ;;
     full) config_path="${FULL_CONFIG}" ;;
 esac
 

@@ -214,8 +214,8 @@ mod tests {
     fn computes_pq_deltas_for_x25519_family() {
         let aggregates = AggregateReport {
             scenarios: vec![
-                scenario(KeyExchangeMode::X25519, "lite", 10.0, 10, 20, 30),
-                scenario(KeyExchangeMode::X25519Mlkem768, "lite", 15.0, 15, 25, 35),
+                scenario(KeyExchangeMode::X25519, "reduced", 10.0, 10, 20, 30),
+                scenario(KeyExchangeMode::X25519Mlkem768, "reduced", 15.0, 15, 25, 35),
             ],
         };
 
@@ -233,7 +233,14 @@ mod tests {
     #[test]
     fn skips_missing_pair_members() {
         let aggregates = AggregateReport {
-            scenarios: vec![scenario(KeyExchangeMode::X25519, "lite", 10.0, 10, 20, 30)],
+            scenarios: vec![scenario(
+                KeyExchangeMode::X25519,
+                "reduced",
+                10.0,
+                10,
+                20,
+                30,
+            )],
         };
 
         let report = compare_aggregates(&aggregates);
@@ -246,8 +253,8 @@ mod tests {
     fn records_zero_denominator_warnings() {
         let aggregates = AggregateReport {
             scenarios: vec![
-                scenario(KeyExchangeMode::X25519, "lite", 0.0, 0, 0, 0),
-                scenario(KeyExchangeMode::X25519Mlkem768, "lite", 15.0, 15, 25, 35),
+                scenario(KeyExchangeMode::X25519, "reduced", 0.0, 0, 0, 0),
+                scenario(KeyExchangeMode::X25519Mlkem768, "reduced", 15.0, 15, 25, 35),
             ],
         };
 

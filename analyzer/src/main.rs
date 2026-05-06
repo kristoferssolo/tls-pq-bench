@@ -86,13 +86,13 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn runs_end_to_end_for_one_valid_lite_run() {
+    fn runs_end_to_end_for_one_valid_reduced_run() {
         let dir = TempDir::new().expect("temp dir");
         write_run(
             dir.path(),
-            "lite-ok",
+            "reduced-ok",
             "00000000-0000-0000-0000-000000000001",
-            "lite",
+            "reduced",
             "ok",
             concat!(
                 r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":100,"warmup":10,"tcp_ns":10,"handshake_ns":20,"ttlb_ns":30}"#,
@@ -117,9 +117,9 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         write_run(
             dir.path(),
-            "lite-ok",
+            "reduced-ok",
             "00000000-0000-0000-0000-000000000001",
-            "lite",
+            "reduced",
             "ok",
             concat!(
                 r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":100,"warmup":10,"tcp_ns":10,"handshake_ns":20,"ttlb_ns":30}"#,
@@ -144,13 +144,13 @@ mod tests {
             "analyzer",
             dir.path().to_str().expect("utf8"),
             "--profile",
-            "lite",
+            "reduced",
         ]);
         assert_ok!(run(&args));
 
         let weekly = fs::read_to_string(dir.path().join("analysis/weekly_aggregates.json"))
             .expect("weekly aggregates");
-        assert!(weekly.contains(r#""schedule_profile": "lite""#));
+        assert!(weekly.contains(r#""schedule_profile": "reduced""#));
         assert!(!weekly.contains(r#""schedule_profile": "full""#));
     }
 
@@ -159,9 +159,9 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         write_run(
             dir.path(),
-            "lite-ok",
+            "reduced-ok",
             "00000000-0000-0000-0000-000000000001",
-            "lite",
+            "reduced",
             "ok",
             concat!(
                 r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":100,"warmup":10,"tcp_ns":10,"handshake_ns":20,"ttlb_ns":30}"#,
@@ -202,9 +202,9 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         write_run(
             dir.path(),
-            "lite-error",
+            "reduced-error",
             "00000000-0000-0000-0000-000000000001",
-            "lite",
+            "reduced",
             "error",
             concat!(
                 r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":100,"warmup":10,"tcp_ns":10,"handshake_ns":20,"ttlb_ns":30}"#,

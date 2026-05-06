@@ -38,7 +38,7 @@ impl Args {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Display)]
 #[strum(serialize_all = "lowercase")]
 pub enum ScheduleProfile {
-    Lite,
+    Reduced,
     Full,
 }
 
@@ -46,7 +46,7 @@ impl ScheduleProfile {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Lite => "lite",
+            Self::Reduced => "reduced",
             Self::Full => "full",
         }
     }
@@ -75,14 +75,14 @@ mod tests {
             "--out-dir",
             "exports",
             "--profile",
-            "lite",
+            "reduced",
             "--strict",
             "--pretty",
             "false",
         ]);
 
         assert_eq!(args.out_dir(), PathBuf::from("exports"));
-        assert_eq!(args.profile, Some(ScheduleProfile::Lite));
+        assert_eq!(args.profile, Some(ScheduleProfile::Reduced));
         assert!(args.strict);
         assert!(!args.pretty);
     }

@@ -116,21 +116,21 @@ mod tests {
     #[test]
     fn pairs_result_and_meta_by_stem() {
         let dir = TestDir::new();
-        dir.write("lite-20260424T010000Z.jsonl", "");
-        dir.write("lite-20260424T010000Z.meta", "{}");
+        dir.write("reduced-20260424T010000Z.jsonl", "");
+        dir.write("reduced-20260424T010000Z.meta", "{}");
         dir.write("ignore.txt", "ignored");
 
         let report = assert_ok!(discover_runs(dir.path()), "discovery should succeed");
 
         assert_eq!(report.runs.len(), 1);
-        assert_eq!(report.runs[0].stem, "lite-20260424T010000Z");
+        assert_eq!(report.runs[0].stem, "reduced-20260424T010000Z");
         assert!(report.diagnostics.is_empty());
     }
 
     #[test]
     fn reports_unmatched_result_and_meta() {
         let dir = TestDir::new();
-        let result_path = dir.write("lite-run.jsonl", "");
+        let result_path = dir.write("reduced-run.jsonl", "");
         let meta_path = dir.write("full-run.meta", "{}");
 
         let report = assert_ok!(discover_runs(dir.path()), "discovery should succeed");
@@ -144,16 +144,16 @@ mod tests {
     #[test]
     fn rejects_duplicate_pairings_for_same_stem() {
         let dir = TestDir::new();
-        dir.write("lite-run.jsonl", "");
+        dir.write("reduced-run.jsonl", "");
         let nested = dir.mkdir("extra");
-        fs::write(nested.join("lite-run.meta"), "{}").expect("nested meta should be written");
-        fs::write(dir.path().join("lite-run.meta"), "{}").expect("root meta should be written");
+        fs::write(nested.join("reduced-run.meta"), "{}").expect("nested meta should be written");
+        fs::write(dir.path().join("reduced-run.meta"), "{}").expect("root meta should be written");
 
         let report = assert_ok!(discover_runs(dir.path()), "discovery should succeed");
 
         assert!(report.runs.is_empty());
         assert_eq!(report.diagnostics.invalid_pairings.len(), 1);
-        assert_eq!(report.diagnostics.invalid_pairings[0].stem, "lite-run");
+        assert_eq!(report.diagnostics.invalid_pairings[0].stem, "reduced-run");
     }
 
     struct TestDir {

@@ -119,7 +119,7 @@ mod tests {
                 r#""config_file":"bench.toml","#,
                 r#""result_path":"results.jsonl","#,
                 r#""log_path":"run.log","#,
-                r#""schedule_profile":"lite","#,
+                r#""schedule_profile":"reduced","#,
                 r#""runner_git_commit":"abc","#,
                 r#""runner_host":"runner-1","#,
                 r#""runner_instance_type":null,"#,
@@ -149,7 +149,7 @@ mod tests {
         let metadata = assert_ok!(load_run_metadata(&path), "metadata should parse");
 
         assert_eq!(metadata.status, "ok");
-        assert_eq!(metadata.schedule_profile.as_deref(), Some("lite"));
+        assert_eq!(metadata.schedule_profile.as_deref(), Some("reduced"));
         assert_eq!(metadata.benchmarks.len(), 1);
         assert_eq!(metadata.benchmarks[0].payload, 1024);
     }

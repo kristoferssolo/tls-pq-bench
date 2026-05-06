@@ -345,7 +345,7 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         let discovered = write_discovered_run(
             &dir,
-            "lite-ok",
+            "reduced-ok",
             &valid_jsonl(
                 "00000000-0000-0000-0000-000000000001",
                 r#""mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":2,"warmup":1"#,
@@ -354,7 +354,7 @@ mod tests {
                 "00000000-0000-0000-0000-000000000001",
                 "ok",
                 None,
-                Some("lite"),
+                Some("reduced"),
             ),
         );
 
@@ -369,7 +369,7 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         let discovered = write_discovered_run(
             &dir,
-            "lite-iters-mixed",
+            "reduced-iters-mixed",
             concat!(
                 r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":2,"warmup":1,"tcp_ns":10,"handshake_ns":20,"ttlb_ns":30}"#,
                 "\n",
@@ -380,7 +380,7 @@ mod tests {
                 "00000000-0000-0000-0000-000000000001",
                 "ok",
                 None,
-                Some("lite"),
+                Some("reduced"),
                 &[
                     BenchmarkSpec {
                         proto: "raw",
@@ -413,7 +413,7 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         let discovered = write_discovered_run(
             &dir,
-            "lite-error",
+            "reduced-error",
             &valid_jsonl(
                 "00000000-0000-0000-0000-000000000001",
                 r#""mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":2,"warmup":1"#,
@@ -422,7 +422,7 @@ mod tests {
                 "00000000-0000-0000-0000-000000000001",
                 "error",
                 Some("runner failed"),
-                Some("lite"),
+                Some("reduced"),
             ),
         );
 
@@ -441,13 +441,13 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         let discovered = write_discovered_run(
             &dir,
-            "lite-empty",
+            "reduced-empty",
             "\n",
             &valid_meta(
                 "00000000-0000-0000-0000-000000000001",
                 "ok",
                 None,
-                Some("lite"),
+                Some("reduced"),
             ),
         );
 
@@ -465,7 +465,7 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         let discovered = write_discovered_run(
             &dir,
-            "lite-run-id-mismatch",
+            "reduced-run-id-mismatch",
             concat!(
                 r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":2,"warmup":1,"tcp_ns":10,"handshake_ns":20,"ttlb_ns":30}"#,
                 "\n",
@@ -476,7 +476,7 @@ mod tests {
                 "00000000-0000-0000-0000-000000000001",
                 "ok",
                 None,
-                Some("lite"),
+                Some("reduced"),
             ),
         );
 
@@ -494,7 +494,7 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         let discovered = write_discovered_run(
             &dir,
-            "lite-meta-run-id-mismatch",
+            "reduced-meta-run-id-mismatch",
             &valid_jsonl(
                 "00000000-0000-0000-0000-000000000001",
                 r#""mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":2,"warmup":1"#,
@@ -503,7 +503,7 @@ mod tests {
                 "00000000-0000-0000-0000-000000000002",
                 "ok",
                 None,
-                Some("lite"),
+                Some("reduced"),
             ),
         );
 
@@ -521,7 +521,7 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         let discovered = write_discovered_run(
             &dir,
-            "lite-scenario-mismatch",
+            "reduced-scenario-mismatch",
             concat!(
                 r#"{"run_id":"00000000-0000-0000-0000-000000000001","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":2,"warmup":1,"tcp_ns":10,"handshake_ns":20,"ttlb_ns":30}"#,
                 "\n",
@@ -532,7 +532,7 @@ mod tests {
                 "00000000-0000-0000-0000-000000000001",
                 "ok",
                 None,
-                Some("lite"),
+                Some("reduced"),
             ),
         );
 
@@ -550,7 +550,7 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         let discovered = write_discovered_run(
             &dir,
-            "lite-bad-meta",
+            "reduced-bad-meta",
             &valid_jsonl(
                 "00000000-0000-0000-0000-000000000001",
                 r#""mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":2,"warmup":1"#,

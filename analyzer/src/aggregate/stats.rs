@@ -253,7 +253,7 @@ mod tests {
         let runs = vec![
             valid_run(
                 "00000000-0000-0000-0000-000000000001",
-                "lite",
+                "reduced",
                 &[
                     (
                         ProtocolMode::Raw,
@@ -278,11 +278,11 @@ mod tests {
                         31,
                     ),
                 ],
-                "/tmp/lite-a.jsonl",
+                "/tmp/reduced-a.jsonl",
             ),
             valid_run(
                 "00000000-0000-0000-0000-000000000002",
-                "lite",
+                "reduced",
                 &[
                     (
                         ProtocolMode::Raw,
@@ -307,7 +307,7 @@ mod tests {
                         33,
                     ),
                 ],
-                "/tmp/lite-b.jsonl",
+                "/tmp/reduced-b.jsonl",
             ),
         ];
 
@@ -315,7 +315,7 @@ mod tests {
 
         assert_eq!(report.scenarios.len(), 1);
         let scenario = &report.scenarios[0];
-        assert_eq!(scenario.key.schedule_profile, "lite");
+        assert_eq!(scenario.key.schedule_profile, "reduced");
         assert_eq!(scenario.tcp.sample_count, 4);
         assert_eq!(scenario.tcp.run_count, 2);
         assert_eq!(scenario.tcp.min, 10);
@@ -325,11 +325,11 @@ mod tests {
     }
 
     #[test]
-    fn keeps_lite_and_full_in_separate_buckets() {
+    fn keeps_reduced_and_full_in_separate_buckets() {
         let runs = vec![
             valid_run(
                 "00000000-0000-0000-0000-000000000001",
-                "lite",
+                "reduced",
                 &[(
                     ProtocolMode::Raw,
                     KeyExchangeMode::X25519,
@@ -341,7 +341,7 @@ mod tests {
                     20,
                     30,
                 )],
-                "/tmp/lite.jsonl",
+                "/tmp/reduced.jsonl",
             ),
             valid_run(
                 "00000000-0000-0000-0000-000000000002",
@@ -371,7 +371,7 @@ mod tests {
         assert_eq!(report.scenarios.len(), 2);
         assert_eq!(
             profiles,
-            BTreeSet::from(["full".to_string(), "lite".to_string()])
+            BTreeSet::from(["full".to_string(), "reduced".to_string()])
         );
     }
 
@@ -380,7 +380,7 @@ mod tests {
         let runs = vec![
             valid_run(
                 "00000000-0000-0000-0000-000000000001",
-                "lite",
+                "reduced",
                 &[(
                     ProtocolMode::Raw,
                     KeyExchangeMode::X25519,
@@ -392,7 +392,7 @@ mod tests {
                     20,
                     30,
                 )],
-                "/tmp/lite.jsonl",
+                "/tmp/reduced.jsonl",
             ),
             valid_run(
                 "00000000-0000-0000-0000-000000000002",
@@ -412,17 +412,17 @@ mod tests {
             ),
         ];
 
-        let report = aggregate_runs(&runs, Some("lite"));
+        let report = aggregate_runs(&runs, Some("reduced"));
 
         assert_eq!(report.scenarios.len(), 1);
-        assert_eq!(report.scenarios[0].key.schedule_profile, "lite");
+        assert_eq!(report.scenarios[0].key.schedule_profile, "reduced");
     }
 
     #[test]
     fn computes_nearest_rank_percentiles() {
         let runs = vec![valid_run(
             "00000000-0000-0000-0000-000000000001",
-            "lite",
+            "reduced",
             &[
                 (
                     ProtocolMode::Raw,
@@ -480,7 +480,7 @@ mod tests {
                     500,
                 ),
             ],
-            "/tmp/lite.jsonl",
+            "/tmp/reduced.jsonl",
         )];
 
         let report = aggregate_runs(&runs, None);
@@ -496,7 +496,7 @@ mod tests {
         let runs = vec![
             valid_run(
                 "00000000-0000-0000-0000-000000000001",
-                "lite",
+                "reduced",
                 &[(
                     ProtocolMode::Raw,
                     KeyExchangeMode::X25519,
@@ -508,11 +508,11 @@ mod tests {
                     20,
                     30,
                 )],
-                "/tmp/lite-a.jsonl",
+                "/tmp/reduced-a.jsonl",
             ),
             valid_run(
                 "00000000-0000-0000-0000-000000000002",
-                "lite",
+                "reduced",
                 &[(
                     ProtocolMode::Raw,
                     KeyExchangeMode::X25519,
@@ -524,7 +524,7 @@ mod tests {
                     21,
                     31,
                 )],
-                "/tmp/lite-b.jsonl",
+                "/tmp/reduced-b.jsonl",
             ),
         ];
 
