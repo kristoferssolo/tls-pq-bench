@@ -157,36 +157,6 @@ Each iteration is emitted as one JSONL record:
 {"run_id":"0195f8cf-2f6f-7e9b-9c52-6e5d6b7d0a10","iteration":0,"proto":"raw","mode":"x25519","payload_bytes":1024,"concurrency":1,"iters":100,"warmup":10,"tcp_ns":120000,"handshake_ns":500000,"ttlb_ns":650000}
 ```
 
-## Analyzer
-
-The Rust `analyzer` binary summarizes one scheduled-results directory tree into
-weekly JSON artifacts.
-
-Basic usage:
-
-```bash
-./target/release/analyzer \
-    /path/to/results
-```
-
-Common options:
-
-- `--out-dir <dir>`: defaults to `<results-dir>/analysis`
-- `--profile reduced|full`: restrict output to one schedule profile
-- `--strict`: abort on the first missing, malformed, or invalid artifact
-- `--pretty true|false`: control JSON pretty-printing, default `true`
-
-The analyzer recursively discovers paired `*.jsonl` and `*.meta` files by shared
-basename stem and writes four files:
-
-- `manifest.json`: run counts, profile list, scenario/comparison counts, and artifact paths
-- `weekly_aggregates.json`: per-scenario weekly summaries plus provenance and warnings
-- `pq_deltas.json`: classical vs PQ family comparisons for matching contexts
-- `diagnostics.json`: skipped runs, unmatched artifacts, parse errors, and comparison warnings
-
-Default mode skips bad inputs when possible and records them in
-`diagnostics.json`. Strict mode makes those same problems fatal.
-
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.
