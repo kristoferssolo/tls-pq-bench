@@ -31,23 +31,6 @@ All raw metrics are stored in nanoseconds as JSONL.
 cargo build --release
 ```
 
-### Fastest Local Smoke Test
-
-Start the default local listener set:
-
-```bash
-just multi-server
-```
-
-In another terminal, run the built-in smoke matrix:
-
-```bash
-just smoke-all
-```
-
-This path uses the server's ephemeral self-signed certificate and insecure
-client verification. It is intended only for local validation.
-
 ### Run One Benchmark Manually
 
 Start one server:
@@ -96,7 +79,6 @@ uv run --script scripts/generate_benchmark_matrix.py --output matrix.toml
 Use this when you are validating correctness or making code changes.
 
 - `just multi-server`
-- `just smoke-all`
 - `just sanity-matrix`
 
 ### 2. Verified Local Or Remote Runs

@@ -13,39 +13,7 @@ If you want automated two-host scheduling, use
 - optional: `uv` for the helper scripts
 - optional: generated CA and server certs for verified runs
 
-## Workflow 1: Local Smoke Validation
-
-Use this to confirm the binaries, listeners, and protocol wiring work.
-
-Start the full local listener set:
-
-```bash
-just multi-server
-```
-
-Run the smoke suite in another terminal:
-
-```bash
-just smoke-all
-```
-
-Default local port layout:
-
-| Port | Protocol | Mode |
-|------|----------|------|
-| 4433 | `raw` | `x25519` |
-| 4434 | `http1` | `x25519` |
-| 4435 | `raw` | `secp256r1` |
-| 4436 | `http1` | `secp256r1` |
-| 4437 | `raw` | `x25519mlkem768` |
-| 4438 | `http1` | `x25519mlkem768` |
-| 4439 | `raw` | `secp256r1mlkem768` |
-| 4440 | `http1` | `secp256r1mlkem768` |
-
-The smoke path uses insecure client verification and the server's ephemeral
-self-signed certificate. Treat it as a development-only workflow.
-
-## Workflow 2: One Manual Benchmark
+## Workflow 1: One Manual Benchmark
 
 Use this when you want a controlled single run without a TOML matrix.
 
@@ -79,7 +47,7 @@ Notes:
 - without `--ca-cert`, verification is insecure
 - `--out` is optional; without it, JSONL is written to stdout
 
-## Workflow 3: CA-Verified Benchmarking
+## Workflow 2: CA-Verified Benchmarking
 
 Use this for reproducible local baselines and all serious remote runs.
 
@@ -129,7 +97,7 @@ Rules to keep straight:
 - the runner host needs a copy of the matching `ca.der`
 - the same `server_name` is also used as the HTTP `Host` header in `http1` mode
 
-## Workflow 4: Matrix Benchmarks
+## Workflow 3: Matrix Benchmarks
 
 Use a TOML config when you want to sweep payloads, modes, or concurrency.
 
@@ -178,7 +146,7 @@ Run it:
 
 Every entry must include a `verification` block.
 
-## Workflow 5: Generated Matrices
+## Workflow 4: Generated Matrices
 
 Use the generator when writing large matrices by hand becomes error-prone.
 

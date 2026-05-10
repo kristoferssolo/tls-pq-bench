@@ -1,8 +1,6 @@
 export RUSTC_WRAPPER :=  env("RUSTC_WRAPPER", "sccache")
 export RUST_LOG := env("RUST_LOG", "warn")
 
-# -euo pipefail; -c must be last so just appends the script correctly
-
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 logs_dir := ".logs"
@@ -22,7 +20,7 @@ alias f := fmt
 alias t := test
 
 [group("build")]
-build:
+build: _setup
     cargo build --release
 
 # Start a single server instance
@@ -129,7 +127,6 @@ runner server_addr="127.0.0.1:4433" server_name="localhost" proto="raw" mode="x2
 [group("bench")]
 sanity-matrix: build
     #!/usr/bin/env bash
-    just _setup
     out="{{ results_dir }}/sanity-$(date +%F-%H%M%S).jsonl"
     echo "Writing sanity matrix results to $out"
     {{ runner }} --config {{ benchmarks_dir }}/sanity.toml > "$out"
@@ -137,7 +134,6 @@ sanity-matrix: build
 [group("bench")]
 baseline-matrix: build
     #!/usr/bin/env bash
-    just _setup
     out="{{ results_dir }}/baseline-$(date +%F-%H%M%S).jsonl"
     echo "Writing baseline matrix results to $out"
     {{ runner }} --config {{ benchmarks_dir }}/baseline.toml > "$out"
@@ -146,42 +142,15 @@ baseline-matrix: build
 generate-matrix out="-":
     uv run --script scripts/generate_benchmark_matrix.py -o {{ out }}
 
-[group("smoke")]
-smoke-raw-x25519:
-    just _bench 127.0.0.1:4433 raw x25519 smoke-raw-x25519.jsonl
 
-[group("smoke")]
-smoke-http1-x25519:
-    just _bench 127.0.0.1:4434 http1 x25519 smoke-http1-x25519.jsonl
-
-[group("smoke")]
-smoke-raw-mlkem:
-    just _bench 127.0.0.1:4437 raw x25519mlkem768 smoke-raw-mlkem.jsonl
-
-[group("smoke")]
-smoke-http1-mlkem:
-    just _bench 127.0.0.1:4438 http1 x25519mlkem768 smoke-http1-mlkem.jsonl
-
-[group("smoke")]
-smoke-raw-secp256r1:
-    just _bench 127.0.0.1:4435 raw secp256r1 smoke-raw-secp256r1.jsonl
-
-[group("smoke")]
-smoke-http1-secp256r1:
-    just _bench 127.0.0.1:4436 http1 secp256r1 smoke-http1-secp256r1.jsonl
-
-[group("smoke")]
-smoke-raw-secp256r1-mlkem:
-    just _bench 127.0.0.1:4439 raw secp256r1mlkem768 smoke-raw-secp256r1-mlkem.jsonl
-
-[group("smoke")]
-smoke-http1-secp256r1-mlkem:
-    just _bench 127.0.0.1:4440 http1 secp256r1mlkem768 smoke-http1-secp256r1-mlkem.jsonl
-
-# Smoke benchmarks - requires multi-server to be running
-# Run all smoke benchmarks
-[group("smoke")]
-smoke-all: smoke-raw-x25519 smoke-http1-x25519 smoke-raw-secp256r1 smoke-http1-secp256r1 smoke-raw-mlkem smoke-http1-mlkem smoke-raw-secp256r1-mlkem smoke-http1-secp256r1-mlkem
+[group("profile")]
+profile-server-resources config="benchmarks/full.toml" out="" repeats="3": build
+    #!/usr/bin/env bash
+    args=(--config "{{ config }}" --repeats "{{ repeats }}")
+    if [[ "{{ out }}" != "" ]]; then
+        args+=(--out "{{ out }}")
+    fi
+    scripts/profile_server_resources.py "${args[@]}"
 
 # Run all checks (fmt, clippy, docs, test)
 [group("dev")]
@@ -263,7 +232,6 @@ _setup:
     mkdir -p {{ results_dir }} {{ logs_dir }} {{ benchmarks_dir }}
 
 _bench server_addr proto mode server_name="localhost" out="" payload="1024" iters="200" warmup="20" concurrency="1": build
-    just _setup
     {{ runner }} \
         --server        {{ server_addr }} \
         --server-name   {{ server_name }} \
