@@ -2,9 +2,6 @@
 
 This document is the practical guide for running benchmarks by hand.
 
-If you want automated two-host scheduling, use
-[scheduled-benchmarks.md](scheduled-benchmarks.md) instead.
-
 ## Prerequisites
 
 - Rust toolchain installed
