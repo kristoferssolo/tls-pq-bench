@@ -135,7 +135,7 @@ Main entry points:
 
 Benchmark outputs stay ignored in this repo. Archive completed `results/full`
 and `results/reduced` runs are available in a separate Git LFS repository:
-[`kristoferssolo/tls-pq-bench-results`](https://github.com/kristoferssolo/tls-pq-bench).
+[`kristoferssolo/tls-pq-bench-results`](https://github.com/kristoferssolo/tls-pq-bench-results).
 
 ### Result Format
 
