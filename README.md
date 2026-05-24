@@ -131,7 +131,13 @@ Main entry points:
 - `just prod-server-service env_file=/etc/tls-pq-bench/server.env`
 - `just prod-schedule env_file=/etc/tls-pq-bench/scheduled.env`
 
-## Result Format
+## Results
+
+Benchmark outputs stay ignored in this repo. Archive completed `results/full`
+and `results/reduced` runs are available in a separate Git LFS repository:
+[`kristoferssolo/tls-pq-bench-results`](https://github.com/kristoferssolo/tls-pq-bench).
+
+### Result Format
 
 Each iteration is emitted as one JSONL record:
 

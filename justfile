@@ -142,6 +142,10 @@ baseline-matrix: build
 generate-matrix out="-":
     uv run --script scripts/generate_benchmark_matrix.py -o {{ out }}
 
+[group("bench")]
+sync-results archive_repo="../tls-pq-bench-results":
+    scripts/sync_results_to_lfs.sh "{{ archive_repo }}"
+
 
 [group("profile")]
 profile-server-resources config="benchmarks/full.toml" out="" repeats="3": build
